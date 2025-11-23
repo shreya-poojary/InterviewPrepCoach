@@ -26,8 +26,8 @@ class QuestionsView:
             padding=ft.padding.only(bottom=20)
         )
         
-        # Get resumes and JDs
-        resumes = ResumeService.get_user_resumes(self.user_id) or []
+        # Get resumes and JDs - use get_all_resumes to show all resumes, not just active ones
+        resumes = ResumeService.get_all_resumes(self.user_id) or []
         jds = JobDescriptionService.get_user_job_descriptions(self.user_id) or []
         
         # Form controls

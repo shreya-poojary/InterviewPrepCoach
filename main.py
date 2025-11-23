@@ -12,6 +12,7 @@ from ui.views.placeholder_view import PlaceholderView
 from ui.views.coach_view import CoachView
 from ui.views.questions_view import QuestionsView
 from ui.views.planner_view import PlannerView
+from ui.views.writer_view import WriterView
 from ui.components.navigation import NavigationRailComponent
 from ui.styles.theme import AppTheme
 from ui.styles.constants import WINDOW_WIDTH, WINDOW_HEIGHT
@@ -76,12 +77,7 @@ def main(page: ft.Page):
                 view = OpportunitiesView(page)
                 nav_index = 4
             elif route == "/writer":
-                view = PlaceholderView(
-                    page,
-                    "Document Writer",
-                    "Generate optimized resumes, cover letters, and cold emails",
-                    ft.Icons.EDIT_DOCUMENT
-                )
+                view = WriterView(page)
                 nav_index = 5
             elif route == "/planner":
                 view = PlannerView(page)

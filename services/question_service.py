@@ -59,18 +59,61 @@ class QuestionService:
             
             print(f"[INFO] Generating {count} {question_type} questions...")
             
-            # 4. Generate with LLM
-            response = provider.generate(prompt)
-            
-            # 5. Parse JSON response
-            try:
-                questions_data = json.loads(response)
-                if not isinstance(questions_data, list):
-                    questions_data = questions_data.get('questions', [])
-            except json.JSONDecodeError as e:
-                print(f"[ERROR] Failed to parse LLM response as JSON: {e}")
-                print(f"[DEBUG] Response: {response[:500]}")
-                return None
+            # 4. Generate with LLM using generate_json to handle text before JSON
+            # Use generate_json if available, otherwise fall back to generate
+            if hasattr(provider, 'generate_json'):
+                response_data = provider.generate_json(prompt)
+                
+                # Check for errors
+                if isinstance(response_data, dict) and 'error' in response_data:
+                    print(f"[ERROR] LLM error: {response_data['error']}")
+                    return None
+                
+                # Extract questions from response
+                if isinstance(response_data, list):
+                    questions_data = response_data
+                elif isinstance(response_data, dict):
+                    questions_data = response_data.get('questions', [])
+                else:
+                    print(f"[ERROR] Unexpected response format: {type(response_data)}")
+                    return None
+            else:
+                # Fallback to generate() and manual parsing
+                response = provider.generate(prompt)
+                
+                # Try to extract JSON from response (may have text before JSON)
+                response_clean = response.strip()
+                
+                # Remove markdown code blocks if present
+                if response_clean.startswith("```json"):
+                    response_clean = response_clean[7:]
+                if response_clean.startswith("```"):
+                    response_clean = response_clean[3:]
+                if response_clean.endswith("```"):
+                    response_clean = response_clean[:-3]
+                response_clean = response_clean.strip()
+                
+                # Try to find JSON array/object in the response
+                # Look for first [ or { that starts valid JSON
+                json_start = -1
+                for i, char in enumerate(response_clean):
+                    if char in ['[', '{']:
+                        json_start = i
+                        break
+                
+                if json_start > 0:
+                    # Extract JSON part
+                    response_clean = response_clean[json_start:]
+                
+                # 5. Parse JSON response
+                try:
+                    questions_data = json.loads(response_clean)
+                    if not isinstance(questions_data, list):
+                        questions_data = questions_data.get('questions', [])
+                except json.JSONDecodeError as e:
+                    print(f"[ERROR] Failed to parse LLM response as JSON: {e}")
+                    print(f"[DEBUG] Response: {response[:500]}")
+                    return None
             
             if not questions_data:
                 print("[ERROR] No questions generated")

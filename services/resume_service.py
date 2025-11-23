@@ -95,7 +95,7 @@ class ResumeService:
         query = """
         SELECT * FROM resumes 
         WHERE user_id = %s AND is_active = TRUE 
-        ORDER BY created_at DESC LIMIT 1
+        ORDER BY uploaded_at DESC LIMIT 1
         """
         return execute_query(query, (user_id,), fetch_one=True)
     
@@ -105,7 +105,7 @@ class ResumeService:
         query = """
         SELECT * FROM resumes 
         WHERE user_id = %s 
-        ORDER BY created_at DESC
+        ORDER BY uploaded_at DESC
         """
         return execute_query(query, (user_id,), fetch_all=True) or []
     

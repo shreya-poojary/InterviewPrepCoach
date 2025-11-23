@@ -263,7 +263,7 @@ class OllamaProvider(BaseLLMProvider):
             if not response_text or len(response_text.strip()) == 0:
                 return {"error": "Empty response from Ollama"}
             
-            # Clean response
+            # Clean response - remove markdown code blocks
             response_text = response_text.strip()
             if response_text.startswith("```json"):
                 response_text = response_text[7:]
@@ -271,11 +271,38 @@ class OllamaProvider(BaseLLMProvider):
                 response_text = response_text[3:]
             if response_text.endswith("```"):
                 response_text = response_text[:-3]
-            
             response_text = response_text.strip()
             
             if not response_text:
                 return {"error": "Empty response after cleaning"}
+            
+            # If response doesn't start with [ or {, try to find JSON in the text
+            # This handles cases where LLM adds explanatory text before JSON
+            if not response_text.startswith(('[', '{')):
+                # Look for first [ or { that starts valid JSON
+                json_start = -1
+                for i, char in enumerate(response_text):
+                    if char in ['[', '{']:
+                        # Check if this looks like the start of JSON (next char should be whitespace, newline, or quote/brace)
+                        if i < len(response_text) - 1:
+                            next_char = response_text[i+1]
+                            if next_char in ['\n', '\r', '\t', ' ', '"', '{', '[']:
+                                json_start = i
+                                break
+                
+                if json_start > 0:
+                    # Extract JSON part
+                    response_text = response_text[json_start:]
+                    print(f"[DEBUG] Extracted JSON starting at position {json_start}")
+                elif json_start == -1:
+                    # No JSON found, try to extract from common patterns
+                    # Look for "Here are..." or similar intro text followed by JSON
+                    import re
+                    # Try to find JSON array or object after colon or newline
+                    json_match = re.search(r'[:\n]\s*(\[[\s\S]*\]|\{[\s\S]*\})', response_text)
+                    if json_match:
+                        response_text = json_match.group(1)
+                        print(f"[DEBUG] Extracted JSON using regex pattern")
             
             # Remove JSON comments (// and /* */) that some LLMs add
             response_text = self._strip_json_comments(response_text)
