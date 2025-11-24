@@ -99,6 +99,7 @@ def main(page: ft.Page):
                 if route not in view_cache:
                     view_cache[route] = PlannerView(page)
                 view = view_cache[route]
+                # Applications will be loaded in build() method
                 nav_index = 6
             elif route == "/coach":
                 if route not in view_cache:

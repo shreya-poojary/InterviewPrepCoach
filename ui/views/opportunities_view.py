@@ -329,18 +329,22 @@ class OpportunitiesView:
             location = job.get('job_city', job.get('location', ''))
             job_url = job.get('job_apply_link', job.get('job_url', ''))
             
+            print(f"[DEBUG] Adding to planner: user_id={self.user_id}, company={company_name}, title={job_title}")
+            
             # Create application in planner
             app_id = ApplicationService.create_application(
                 user_id=self.user_id,
                 company_name=company_name,
                 job_title=job_title,
-                location=location,
-                job_url=job_url,
+                location=location if location else None,
+                job_url=job_url if job_url else None,
                 status='saved',
                 notes=f"Added from job search"
             )
             
-            if app_id:
+            print(f"[DEBUG] create_application returned: {app_id}")
+            
+            if app_id and app_id > 0:
                 # Close dialog if provided
                 if dialog:
                     self._close_dialog(dialog)
@@ -348,28 +352,32 @@ class OpportunitiesView:
                     self._close_dialog(self.page.dialog)
                 
                 self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text(f"✅ Added '{job_title}' at {company_name} to Application Planner!"), 
-                    bgcolor="green",
-                    duration=3000
+                    content=ft.Text(f"✅ Added '{job_title}' at {company_name} to Application Planner! (ID: {app_id})"), 
+                    bgcolor=ft.Colors.GREEN_400,
+                    duration=4000
                 )
                 self.page.snack_bar.open = True
                 self.page.update()
+                print(f"[SUCCESS] Application added to planner with ID: {app_id}")
             else:
+                error_msg = f"❌ Failed to add to planner. Returned ID: {app_id}. Check console for details."
+                print(f"[ERROR] {error_msg}")
                 self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text("❌ Failed to add to planner"), 
-                    bgcolor="red",
-                    duration=3000
+                    content=ft.Text(error_msg), 
+                    bgcolor=ft.Colors.RED_400,
+                    duration=5000
                 )
                 self.page.snack_bar.open = True
                 self.page.update()
         except Exception as e:
-            print(f"[ERROR] Error adding to planner: {e}")
+            error_msg = f"Error adding to planner: {str(e)}"
+            print(f"[ERROR] {error_msg}")
             import traceback
             traceback.print_exc()
             self.page.snack_bar = ft.SnackBar(
-                content=ft.Text(f"Error: {str(e)}"), 
-                bgcolor="red",
-                duration=3000
+                content=ft.Text(f"❌ {error_msg}"), 
+                bgcolor=ft.Colors.RED_400,
+                duration=5000
             )
             self.page.snack_bar.open = True
             self.page.update()

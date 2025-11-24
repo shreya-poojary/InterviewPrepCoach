@@ -14,22 +14,56 @@ class ApplicationService:
                           location: Optional[str] = None,
                           jd_id: Optional[int] = None,
                           status: str = 'saved',
-                          notes: Optional[str] = None) -> Optional[int]:
+                          notes: Optional[str] = None,
+                          applied_date: Optional = None,
+                          interview_date: Optional = None,
+                          salary_offered: Optional[float] = None) -> Optional[int]:
         """Create application record"""
         try:
+            from database.connection import get_connection
+            
+            print(f"[DEBUG] create_application called: user_id={user_id}, company={company_name}, title={job_title}")
+            print(f"[DEBUG] Dates: applied_date={applied_date}, interview_date={interview_date}, salary={salary_offered}")
+            
             query = """
                 INSERT INTO applications 
-                (user_id, company_name, job_title, job_url, location, jd_id, status, notes, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                (user_id, company_name, job_title, job_url, location, jd_id, status, notes, 
+                 applied_date, interview_date, salary_offered, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             """
-            application_id = execute_query(
-                query,
-                (user_id, company_name, job_title, job_url, location, jd_id, status, notes),
-                commit=True
-            )
-            return application_id
+            
+            params = (user_id, company_name, job_title, job_url, location, jd_id, status, notes,
+                     applied_date, interview_date, salary_offered)
+            
+            print(f"[DEBUG] Executing query with {len(params)} parameters")
+            
+            # Use direct connection to get lastrowid properly
+            conn = None
+            cursor = None
+            try:
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                conn.commit()
+                application_id = cursor.lastrowid
+                cursor.close()
+                conn.close()
+                
+                print(f"[DEBUG] Application created successfully with ID: {application_id}")
+                return application_id if application_id and application_id > 0 else None
+            except Exception as db_error:
+                if conn:
+                    conn.rollback()
+                if cursor:
+                    cursor.close()
+                if conn:
+                    conn.close()
+                raise db_error
+                
         except Exception as e:
-            print(f"Error creating application: {e}")
+            print(f"[ERROR] Error creating application: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     @staticmethod
