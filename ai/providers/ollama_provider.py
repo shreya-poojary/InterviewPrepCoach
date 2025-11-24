@@ -70,58 +70,9 @@ class OllamaProvider(BaseLLMProvider):
         Returns:
             Repaired JSON string
         """
-        # Fix missing quotes around unquoted strings in arrays
-        # Pattern: [..., word, ...] -> [..., "word", ...]
-        # But be careful not to break numbers, booleans, null
-        def fix_unquoted_strings(match):
-            content = match.group(1)
-            # Split by comma, but preserve quoted strings
-            parts = []
-            current = ""
-            in_quotes = False
-            quote_char = None
-            
-            for char in content:
-                if char in ('"', "'") and (not current or current[-1] != '\\'):
-                    if not in_quotes:
-                        in_quotes = True
-                        quote_char = char
-                    elif char == quote_char:
-                        in_quotes = False
-                        quote_char = None
-                    current += char
-                elif char == ',' and not in_quotes:
-                    parts.append(current.strip())
-                    current = ""
-                else:
-                    current += char
-            
-            if current:
-                parts.append(current.strip())
-            
-            # Fix each part
-            fixed_parts = []
-            for part in parts:
-                part = part.strip()
-                if not part:
-                    continue
-                # If it's already quoted, keep it
-                if (part.startswith('"') and part.endswith('"')) or \
-                   (part.startswith("'") and part.endswith("'")):
-                    fixed_parts.append(part)
-                # If it's a number, boolean, or null, keep it
-                elif part.lower() in ('true', 'false', 'null') or \
-                     (part.replace('.', '').replace('-', '').isdigit()):
-                    fixed_parts.append(part)
-                # Otherwise, quote it
-                else:
-                    fixed_parts.append(f'"{part}"')
-            
-            return '[' + ', '.join(fixed_parts) + ']'
-        
-        # Simple approach: find patterns like [..., word, ...] and quote unquoted strings
-        # This is a simplified fix - more complex repairs might be needed
-        text = re.sub(r'\[([^\]]+)\]', lambda m: self._fix_array_items(m.group(0)), text)
+        # Use the more comprehensive _fix_array_items method for array repair
+        # This method handles nested structures and is more robust
+        text = self._fix_array_items(text)
         
         return text
     
@@ -211,17 +162,39 @@ class OllamaProvider(BaseLLMProvider):
             # Build prompt - keep it simple for Ollama
             full_prompt = prompt
             if system_prompt:
-                # Prepend system prompt, but keep it concise
-                system_truncated = system_prompt[:300] if len(system_prompt) > 300 else system_prompt
+                # System prompt now contains format instructions - preserve it fully (it's ~1500 chars)
+                # Only truncate if it's extremely long (shouldn't happen with our prompts)
+                system_truncated = system_prompt[:2000] if len(system_prompt) > 2000 else system_prompt
                 full_prompt = f"{system_truncated}\n\n{prompt}"
             
             # Limit total prompt length to prevent 500 errors (Ollama can be sensitive to long prompts)
             # Use a more conservative limit for better reliability
-            max_prompt_length = 1500
+            # Increased limit since we're now truncating input data instead
+            max_prompt_length = 2000
             if len(full_prompt) > max_prompt_length:
-                # Keep first 1000 chars and last 500 chars, preserving context
-                full_prompt = full_prompt[:1000] + "\n\n[... content truncated ...]\n\n" + full_prompt[-500:]
-                print(f"[WARNING] Prompt truncated from {len(prompt)} to {len(full_prompt)} chars")
+                # Smart truncation: preserve system prompt and format instructions
+                # System prompt is at the start, format instructions should be preserved
+                # Truncate from the middle of the data section
+                system_length = len(system_truncated) if system_prompt else 0
+                reserved_length = system_length + 200  # Reserve space for system + format instructions
+                data_section = prompt
+                
+                if len(full_prompt) > max_prompt_length:
+                    # Truncate data section, keeping start and end
+                    max_data_length = max_prompt_length - reserved_length - 100  # Buffer
+                    if len(data_section) > max_data_length:
+                        first_part = int(max_data_length * 0.6)
+                        last_part = max_data_length - first_part - 50
+                        data_section = data_section[:first_part] + "\n\n[... truncated ...]\n\n" + data_section[-last_part:]
+                    
+                    # Reconstruct with preserved system prompt
+                    if system_prompt:
+                        full_prompt = f"{system_truncated}\n\n{data_section}"
+                    else:
+                        full_prompt = data_section
+                    
+                    original_length = len(prompt) + (len(system_truncated) if system_prompt else 0)
+                    print(f"[WARNING] Prompt truncated from {original_length} to {len(full_prompt)} chars (preserved format instructions)")
             
             # Prepare request payload
             payload = {
@@ -248,11 +221,53 @@ class OllamaProvider(BaseLLMProvider):
             # Check for errors before parsing JSON
             if response.status_code != 200:
                 error_detail = "Unknown error"
+                error_json_data = None
                 try:
-                    error_json = response.json()
-                    error_detail = error_json.get('error', {}).get('message', str(error_json))
+                    error_json_data = response.json()
+                    # Handle both dict and string error formats
+                    if isinstance(error_json_data, dict):
+                        error_detail = error_json_data.get('error', error_json_data.get('message', str(error_json_data)))
+                    else:
+                        error_detail = str(error_json_data)
                 except:
                     error_detail = response.text[:200] if hasattr(response, 'text') else str(response.status_code)
+                
+                # Check for memory-related errors and provide helpful guidance
+                error_lower = str(error_detail).lower()
+                if 'memory' in error_lower or 'gpu' in error_lower or 'system memory' in error_lower:
+                    # Check if it's already a small model
+                    is_small_model = any(x in self.model_name.lower() for x in ['mini', '1b', '3b', 'phi'])
+                    
+                    if is_small_model:
+                        # Already using small model - suggest CPU mode or freeing memory
+                        helpful_msg = (
+                            f"⚠️ Insufficient memory even for '{self.model_name}'. Solutions:\n"
+                            f"1. Force CPU-only mode (Windows PowerShell):\n"
+                            f"   $env:OLLAMA_NUM_GPU='0'\n"
+                            f"   ollama serve\n"
+                            f"2. Free up system memory:\n"
+                            f"   • Close other applications\n"
+                            f"   • Restart your computer\n"
+                            f"3. Try tiny model: ollama pull tinyllama\n"
+                            f"   (Then update Settings to use 'tinyllama')\n"
+                            f"Original error: {error_detail}"
+                        )
+                    else:
+                        # Using large model - suggest smaller ones
+                        helpful_msg = (
+                            f"⚠️ Insufficient memory to load model '{self.model_name}'. Solutions:\n"
+                            f"1. Use smaller model (recommended):\n"
+                            f"   • Run: ollama pull tinyllama (smallest)\n"
+                            f"   • Or: ollama pull phi3:mini\n"
+                            f"   • Then update Settings to use the smaller model\n"
+                            f"2. Force CPU-only mode (Windows PowerShell):\n"
+                            f"   $env:OLLAMA_NUM_GPU='0'\n"
+                            f"   ollama serve\n"
+                            f"3. Free up system memory\n"
+                            f"Original error: {error_detail}"
+                        )
+                    print(f"[ERROR] {helpful_msg}")
+                    return f"Error: {helpful_msg}"
                 
                 error_msg = f"Ollama server error {response.status_code}: {error_detail}"
                 print(f"[ERROR] {error_msg}")
@@ -276,9 +291,50 @@ class OllamaProvider(BaseLLMProvider):
             if hasattr(e, 'response') and e.response is not None:
                 try:
                     error_json = e.response.json()
-                    error_detail = error_json.get('error', {}).get('message', str(error_json))
+                    # Handle both dict and string error formats
+                    if isinstance(error_json, dict):
+                        error_detail = error_json.get('error', error_json.get('message', str(error_json)))
+                    else:
+                        error_detail = str(error_json)
                 except:
                     error_detail = e.response.text[:200] if hasattr(e.response, 'text') else str(e.response.status_code)
+            
+            # Check for memory-related errors
+            error_lower = str(error_detail).lower()
+            if 'memory' in error_lower or 'gpu' in error_lower or 'system memory' in error_lower:
+                # Check if it's already a small model
+                is_small_model = any(x in self.model_name.lower() for x in ['mini', '1b', '3b', 'phi'])
+                
+                if is_small_model:
+                    # Already using small model - suggest CPU mode or freeing memory
+                    helpful_msg = (
+                        f"⚠️ Insufficient memory even for '{self.model_name}'. Solutions:\n"
+                        f"1. Force CPU-only mode (Windows PowerShell):\n"
+                        f"   $env:OLLAMA_NUM_GPU='0'\n"
+                        f"   ollama serve\n"
+                        f"2. Free up system memory:\n"
+                        f"   • Close other applications\n"
+                        f"   • Restart your computer\n"
+                        f"3. Try tiny model: ollama pull tinyllama\n"
+                        f"   (Then update Settings to use 'tinyllama')\n"
+                        f"Original error: {error_detail}"
+                    )
+                else:
+                    # Using large model - suggest smaller ones
+                    helpful_msg = (
+                        f"⚠️ Insufficient memory to load model '{self.model_name}'. Solutions:\n"
+                        f"1. Use smaller model (recommended):\n"
+                        f"   • Run: ollama pull tinyllama (smallest)\n"
+                        f"   • Or: ollama pull phi3:mini\n"
+                        f"   • Then update Settings to use the smaller model\n"
+                        f"2. Force CPU-only mode (Windows PowerShell):\n"
+                        f"   $env:OLLAMA_NUM_GPU='0'\n"
+                        f"   ollama serve\n"
+                        f"3. Free up system memory\n"
+                        f"Original error: {error_detail}"
+                    )
+                print(f"[ERROR] {helpful_msg}")
+                return f"Error: {helpful_msg}"
             
             error_msg = f"Ollama server error: {e.response.status_code if hasattr(e, 'response') and e.response else 'Unknown'}: {error_detail}"
             print(f"[ERROR] {error_msg}")
@@ -390,6 +446,10 @@ class OllamaProvider(BaseLLMProvider):
             # Fix control characters before parsing
             response_text = fix_control_chars(response_text)
             
+            # Fix percentage signs in numeric values (e.g., "score": 30% -> "score": 30)
+            # This handles cases where LLMs add % to numbers in JSON values
+            response_text = re.sub(r':\s*([0-9]+\.?[0-9]*)\s*%', r': \1', response_text)
+            
             # Try parsing
             try:
                 return json.loads(response_text)
@@ -401,6 +461,9 @@ class OllamaProvider(BaseLLMProvider):
                 try:
                     # First fix control characters
                     repaired = fix_control_chars(response_text)
+                    
+                    # Fix percentage signs in numeric values
+                    repaired = re.sub(r':\s*([0-9]+\.?[0-9]*)\s*%', r': \1', repaired)
                     
                     # Fix missing opening quotes: , word" -> , "word" (most common issue)
                     repaired = re.sub(r',\s*([A-Za-z_][A-Za-z0-9_/() ]+?)"', r', "\1"', repaired)

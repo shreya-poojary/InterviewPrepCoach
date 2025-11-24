@@ -6,10 +6,53 @@ from services.llm_service import LLMService
 from services.resume_service import ResumeService
 from services.jd_service import JobDescriptionService
 from config.prompts import Prompts
+from core.response_normalizer import CompatibilityAnalysisNormalizer
 import json
 
 class CompatibilityService:
     """Analyzes compatibility between resume and job description"""
+    
+    @staticmethod
+    def _extract_skills_from_list(skills_list):
+        """
+        Extract skill names from various formats (list of strings, list of dicts, etc.)
+        
+        Args:
+            skills_list: List of skills in various formats
+            
+        Returns:
+            List of skill name strings
+        """
+        if not skills_list:
+            return []
+        
+        extracted = []
+        for item in skills_list:
+            if isinstance(item, dict):
+                # Handle format: {'area': 'Programming Languages', 'description': ['Python']}
+                if 'description' in item:
+                    desc = item['description']
+                    if isinstance(desc, list):
+                        extracted.extend([str(skill) for skill in desc if skill])
+                    else:
+                        extracted.append(str(desc))
+                elif 'area' in item:
+                    extracted.append(str(item['area']))
+                else:
+                    # Try to extract any string values
+                    for key, value in item.items():
+                        if isinstance(value, str) and value:
+                            extracted.append(value)
+                        elif isinstance(value, list):
+                            extracted.extend([str(v) for v in value if v])
+            elif isinstance(item, str):
+                extracted.append(item)
+            else:
+                # Fallback: convert to string
+                extracted.append(str(item))
+        
+        # Remove duplicates and empty strings
+        return list(dict.fromkeys([s.strip() for s in extracted if s and s.strip()]))
     
     @staticmethod
     def analyze_compatibility(user_id: int, resume_id: int, jd_id: int) -> Optional[Dict[str, Any]]:
@@ -27,7 +70,7 @@ class CompatibilityService:
             # Get resume
             with DatabaseManager.get_cursor() as cursor:
                 cursor.execute("""
-                    SELECT resume_text FROM resumes
+                    SELECT resume_text, extracted_text FROM resumes
                     WHERE resume_id = %s AND user_id = %s
                 """, (resume_id, user_id))
                 resume_result = cursor.fetchone()
@@ -45,11 +88,36 @@ class CompatibilityService:
                 if not jd_result:
                     return {"error": "Job description not found"}
             
-            resume_text = resume_result['resume_text']
+            # Use resume_text if available, fallback to extracted_text
+            resume_text = resume_result.get('resume_text') or resume_result.get('extracted_text', '')
+            if not resume_text:
+                return {"error": "Resume text not found"}
             jd_text = jd_result['jd_text']
             job_description_id = jd_result['id']  # Get the actual id for job_description_id column
             
             print(f"[INFO] Resume text length: {len(resume_text)}, JD text length: {len(jd_text)}")
+            
+            # Intelligently truncate resume and JD text to fit within prompt limits
+            # Reserve ~500 chars for prompt template and format instructions
+            # System prompt is ~500 chars, so we have ~1000 chars for data
+            max_data_length = 1000
+            max_resume_length = max_data_length // 2  # Split between resume and JD
+            max_jd_length = max_data_length // 2
+            
+            def truncate_text(text: str, max_length: int) -> str:
+                """Truncate text intelligently, preserving important parts"""
+                if len(text) <= max_length:
+                    return text
+                # Keep first 60% and last 40% to preserve context
+                first_part = int(max_length * 0.6)
+                last_part = max_length - first_part - 50  # Reserve 50 chars for separator
+                return text[:first_part] + "\n\n[... content truncated for length ...]\n\n" + text[-last_part:]
+            
+            truncated_resume = truncate_text(resume_text, max_resume_length)
+            truncated_jd = truncate_text(jd_text, max_jd_length)
+            
+            if len(resume_text) > max_resume_length or len(jd_text) > max_jd_length:
+                print(f"[INFO] Text truncated: resume {len(resume_text)}->{len(truncated_resume)}, JD {len(jd_text)}->{len(truncated_jd)}")
             
             # Call LLM for analysis
             llm_service = LLMService.get_instance()
@@ -61,43 +129,59 @@ class CompatibilityService:
             
             print(f"[INFO] Using LLM provider: {type(provider).__name__}")
             
-            prompt = Prompts.PROFILE_ANALYSIS.format(
-                resume_text=resume_text,
-                job_description=jd_text
+            # Build user prompt with truncated data
+            prompt = Prompts.COMPATIBILITY_ANALYSIS.format(
+                resume_text=truncated_resume,
+                job_description=truncated_jd
             )
+            
+            # Get system prompt (role definition and instructions)
+            system_prompt = Prompts.COMPATIBILITY_ANALYSIS_SYSTEM
             
             print(f"[INFO] Calling LLM for analysis...")
             try:
-                analysis = provider.generate_json(prompt)
-                print(f"[INFO] LLM analysis complete: {analysis}")
+                raw_analysis = provider.generate_json(prompt, system_prompt=system_prompt)
+                print(f"[INFO] LLM analysis complete (raw): {raw_analysis}")
             except Exception as llm_error:
                 print(f"[ERROR] LLM generation failed: {llm_error}")
                 import traceback
                 traceback.print_exc()
                 return {"error": f"LLM analysis failed: {str(llm_error)}"}
             
-            if "error" in analysis:
-                print(f"[ERROR] Analysis returned error: {analysis.get('error')}")
-                return analysis
+            if "error" in raw_analysis:
+                error_msg = raw_analysis.get('error', 'Unknown error')
+                print(f"[ERROR] Analysis returned error: {error_msg}")
+                return {"error": error_msg, "compatibility_score": 0}
             
-            if not analysis:
-                return {"error": "Analysis returned empty result"}
+            if not raw_analysis:
+                return {"error": "Analysis returned empty result", "compatibility_score": 0}
+            
+            # Normalize the response to canonical format (works with any LLM provider)
+            analysis = CompatibilityAnalysisNormalizer.normalize(raw_analysis)
+            print(f"[INFO] Normalized analysis (canonical format): {analysis}")
+            
+            # All data is now in canonical format - extract directly
+            compatibility_score = analysis.get('compatibility_score', 0.0)
+            matched_skills = analysis.get('matched_skills', [])
+            missing_skills = analysis.get('missing_skills', [])
+            strengths = analysis.get('strengths', [])
+            suggestions = analysis.get('suggestions', [])
+            missing_qualifications = analysis.get('missing_qualifications', [])
             
             # Save to database
-            # Handle both 'suggestions' and 'improvement_suggestions' keys
-            suggestions = analysis.get('suggestions', []) or analysis.get('improvement_suggestions', [])
-            
+            # All data is already in canonical format from normalizer
             with DatabaseManager.get_cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO compatibility_analyses
                     (user_id, resume_id, job_description_id, jd_id, compatibility_score, matched_skills,
-                     missing_skills, missing_qualifications, improvement_suggestions)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     missing_skills, missing_qualifications, strengths, improvement_suggestions)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (user_id, resume_id, job_description_id, jd_id,
-                      analysis.get('compatibility_score'),
-                      json.dumps(analysis.get('matched_skills', [])),
-                      json.dumps(analysis.get('missing_skills', [])),
-                      json.dumps(analysis.get('missing_qualifications', [])),
+                      compatibility_score,
+                      json.dumps(matched_skills),
+                      json.dumps(missing_skills),
+                      json.dumps(missing_qualifications),
+                      json.dumps(strengths),
                       json.dumps(suggestions)))
                 
                 analysis_id = cursor.lastrowid
@@ -108,13 +192,17 @@ class CompatibilityService:
                         (analysis_id,)
                     )
                 
+                # Analysis is already normalized - all fields are in canonical format
+                # Add analysis_id for tracking
                 analysis['analysis_id'] = analysis_id
             
-            # Ensure 'suggestions' key exists in returned analysis
-            if 'suggestions' not in analysis and suggestions:
-                analysis['suggestions'] = suggestions
-                
-                analysis['analysis_id'] = cursor.lastrowid
+            print(f"[INFO] Analysis saved successfully (ID: {analysis_id})")
+            print(f"[DEBUG] Final normalized analysis keys: {list(analysis.keys())}")
+            print(f"[DEBUG] Compatibility score: {compatibility_score}")
+            print(f"[DEBUG] Matched skills count: {len(matched_skills)}")
+            print(f"[DEBUG] Missing skills count: {len(missing_skills)}")
+            print(f"[DEBUG] Strengths count: {len(strengths)}")
+            print(f"[DEBUG] Suggestions count: {len(suggestions)}")
             
             return analysis
         

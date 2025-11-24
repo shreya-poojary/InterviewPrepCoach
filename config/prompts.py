@@ -3,8 +3,38 @@ AI prompts for various features
 """
 
 # Profile Analysis & Compatibility
+COMPATIBILITY_ANALYSIS_SYSTEM_PROMPT = """
+You are an expert career advisor and recruiter specializing in resume and job description analysis.
+Your task is to analyze compatibility between resumes and job descriptions and provide detailed,
+actionable feedback in a structured JSON format.
+
+CRITICAL: You MUST return ONLY valid JSON in this EXACT format (no markdown, no code blocks, no explanations):
+{
+  "compatibility_score": 75,
+  "matched_skills": ["Python", "SQL", "AWS"],
+  "missing_skills": ["JavaScript", "React"],
+  "missing_qualifications": [],
+  "strengths": [{"area": "Technical Skills", "description": "Strong background in Python"}],
+  "suggestions": ["Learn JavaScript", "Highlight cloud experience"]
+}
+
+REQUIREMENTS:
+- compatibility_score: number 0-100 (not string, not percentage sign)
+- matched_skills: array of skill name strings (e.g., ["Python"], not [["Python"]] or ["area", "description"])
+- missing_skills: array of skill name strings
+- strengths: array of objects with "area" and "description" keys, or array of strings
+- suggestions: array of improvement recommendation strings
+- Return ONLY the JSON object - no markdown, no code blocks, no explanations before or after
+
+Key principles:
+- Be specific, actionable, and honest in your assessment
+- Focus on concrete skills, experiences, and qualifications
+- Extract actual skill names from resume/JD, not category names
+- Calculate compatibility_score based on: skills match (40%), experience relevance (30%), alignment (20%), overall fit (10%)
+"""
+
 COMPATIBILITY_ANALYSIS_PROMPT = """
-You are an expert career advisor and recruiter. Analyze the compatibility between the provided resume and job description.
+Analyze the compatibility between the provided resume and job description.
 
 Resume:
 {resume_text}
@@ -12,19 +42,8 @@ Resume:
 Job Description:
 {job_description}
 
-Provide a detailed analysis in the following JSON format. IMPORTANT: Return ONLY valid JSON without any comments, explanations, or markdown formatting:
-{{
-  "compatibility_score": <0-100>,
-  "matched_skills": ["skill1", "skill2", ...],
-  "missing_skills": ["skill1", "skill2", ...],
-  "missing_qualifications": ["qualification1", "qualification2", ...],
-  "strengths": ["strength1", "strength2", ...],
-  "suggestions": ["specific actionable suggestion 1", "specific actionable suggestion 2", ...]
-}}
-
-CRITICAL: Return ONLY the JSON object. Do not include any comments (// or /* */), explanations, or markdown code blocks. The response must be valid JSON that can be parsed directly.
-
-Be specific, actionable, and honest in your assessment.
+Return your analysis as a JSON object following the format specified in the system prompt.
+Focus on extracting actual skill names (e.g., "Python", "JavaScript") not categories.
 """
 
 # Question Generation
@@ -181,7 +200,9 @@ class Prompts:
     
     # Profile Analysis
     PROFILE_ANALYSIS = COMPATIBILITY_ANALYSIS_PROMPT
+    PROFILE_ANALYSIS_SYSTEM = COMPATIBILITY_ANALYSIS_SYSTEM_PROMPT
     COMPATIBILITY_ANALYSIS = COMPATIBILITY_ANALYSIS_PROMPT
+    COMPATIBILITY_ANALYSIS_SYSTEM = COMPATIBILITY_ANALYSIS_SYSTEM_PROMPT
     
     # Questions
     QUESTION_GENERATION = QUESTION_GENERATION_PROMPT
