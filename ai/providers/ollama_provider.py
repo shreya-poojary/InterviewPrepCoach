@@ -208,23 +208,46 @@ class OllamaProvider(BaseLLMProvider):
             Generated text
         """
         try:
+            # Build prompt - keep it simple for Ollama
             full_prompt = prompt
             if system_prompt:
-                full_prompt = f"{system_prompt}\n\n{prompt}"
+                # Prepend system prompt, but keep it concise
+                system_truncated = system_prompt[:500] if len(system_prompt) > 500 else system_prompt
+                full_prompt = f"{system_truncated}\n\n{prompt}"
+            
+            # Limit total prompt length to prevent 500 errors
+            if len(full_prompt) > 2000:
+                # Keep first 1500 chars and last 500 chars
+                full_prompt = full_prompt[:1500] + "\n...\n" + full_prompt[-500:]
+            
+            # Prepare request payload
+            payload = {
+                "model": self.model_name,
+                "prompt": full_prompt,
+                "stream": False
+            }
+            
+            # Add optional parameters only if they're set
+            if self.temperature is not None:
+                payload["options"] = {
+                    "temperature": self.temperature
+                }
+            
+            print(f"[DEBUG] Ollama request: model={self.model_name}, prompt_length={len(full_prompt)}")
             
             response = requests.post(
                 f"{self.base_url}/api/generate",
-                json={
-                    "model": self.model_name,
-                    "prompt": full_prompt,
-                    "temperature": self.temperature,
-                    "stream": False
-                },
-                timeout=180  # Increased timeout for longer responses
+                json=payload,
+                timeout=180
             )
             
             response.raise_for_status()
             result = response.json()
+            
+            if 'response' not in result:
+                print(f"[ERROR] Ollama response missing 'response' key: {result}")
+                return "Error: Invalid response format from Ollama"
+            
             return result.get('response', '')
         
         except requests.exceptions.ConnectionError:

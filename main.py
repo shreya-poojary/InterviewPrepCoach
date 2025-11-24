@@ -46,6 +46,9 @@ def main(page: ft.Page):
     # Current view container
     current_view = ft.Container(expand=True)
     
+    # View cache to persist state across route changes
+    view_cache = {}
+    
     def route_change(e):
         """Handle route changes"""
         try:
@@ -56,40 +59,61 @@ def main(page: ft.Page):
             return
         
         try:
+            # Check if view exists in cache, otherwise create new
             if route == "/":
-                view = HomeView(page)
+                if route not in view_cache:
+                    view_cache[route] = HomeView(page)
+                view = view_cache[route]
                 nav_index = 0
             elif route == "/profile_analysis":
-                view = ProfileAnalysisView(page)
+                if route not in view_cache:
+                    view_cache[route] = ProfileAnalysisView(page)
+                view = view_cache[route]
                 nav_index = 1
             elif route == "/questions":
-                view = QuestionsView(page)
+                if route not in view_cache:
+                    view_cache[route] = QuestionsView(page)
+                view = view_cache[route]
                 nav_index = 2
             elif route == "/practice":
-                view = PlaceholderView(
-                    page,
-                    "Practice Sessions",
-                    "Practice interviews with AI feedback in written, audio, or video mode",
-                    ft.Icons.PLAY_CIRCLE
-                )
+                if route not in view_cache:
+                    view_cache[route] = PlaceholderView(
+                        page,
+                        "Practice Sessions",
+                        "Practice interviews with AI feedback in written, audio, or video mode",
+                        ft.Icons.PLAY_CIRCLE
+                    )
+                view = view_cache[route]
                 nav_index = 3
             elif route == "/opportunities":
-                view = OpportunitiesView(page)
+                if route not in view_cache:
+                    view_cache[route] = OpportunitiesView(page)
+                view = view_cache[route]
                 nav_index = 4
             elif route == "/writer":
-                view = WriterView(page)
+                if route not in view_cache:
+                    view_cache[route] = WriterView(page)
+                view = view_cache[route]
                 nav_index = 5
             elif route == "/planner":
-                view = PlannerView(page)
+                if route not in view_cache:
+                    view_cache[route] = PlannerView(page)
+                view = view_cache[route]
                 nav_index = 6
             elif route == "/coach":
-                view = CoachView(page)
+                if route not in view_cache:
+                    view_cache[route] = CoachView(page)
+                view = view_cache[route]
                 nav_index = 7
             elif route == "/settings":
-                view = SettingsView(page)
+                if route not in view_cache:
+                    view_cache[route] = SettingsView(page)
+                view = view_cache[route]
                 nav_index = 8
             else:
-                view = HomeView(page)
+                if "/" not in view_cache:
+                    view_cache["/"] = HomeView(page)
+                view = view_cache["/"]
                 nav_index = 0
             
             # Update navigation selection

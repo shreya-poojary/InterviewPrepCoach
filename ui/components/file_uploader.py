@@ -104,23 +104,32 @@ class FileUploadComponent:
             
             # If we have a file path, validate and use it
             if file_path and os.path.exists(file_path):
-                # Validate file extension
-                file_ext = os.path.splitext(file_name)[1].lower()
-                if self.allowed_extensions and file_ext not in [ext.lower() for ext in self.allowed_extensions]:
-                    print(f"[WARNING] File extension {file_ext} not in allowed extensions")
-                    if self.status_text:
-                        allowed = ", ".join(self.allowed_extensions)
-                        self.status_text.value = f"[ERROR] Invalid file type. Allowed: {allowed}"
-                        self.status_text.color = "red"
-                        self.status_text.update()
-                    return
+                # Validate file extension only if allowed_extensions is specified and not empty
+                if self.allowed_extensions and len(self.allowed_extensions) > 0:
+                    file_ext = os.path.splitext(file_name)[1].lower()
+                    if file_ext not in [ext.lower() for ext in self.allowed_extensions]:
+                        print(f"[WARNING] File extension {file_ext} not in allowed extensions")
+                        if self.status_text and self._page:
+                            try:
+                                allowed = ", ".join(self.allowed_extensions)
+                                self.status_text.value = f"[ERROR] Invalid file type. Allowed: {allowed}"
+                                self.status_text.color = "red"
+                                self.status_text.update()
+                            except AssertionError:
+                                # Status text not on page
+                                pass
+                        return
                 
                 print(f"[DEBUG] [OK] File found at: {file_path}")
                 self.selected_file = file_path
-                if self.status_text:
-                    self.status_text.value = f"[OK] Selected: {file_name}"
-                    self.status_text.color = "green"
-                    self.status_text.update()
+                if self.status_text and self._page:
+                    try:
+                        self.status_text.value = f"[OK] Selected: {file_name}"
+                        self.status_text.color = "green"
+                        self.status_text.update()
+                    except AssertionError:
+                        # Status text not on page (e.g., in coach view attachment)
+                        pass
                 
                 # Call the callback
                 if self.on_file_selected:
@@ -130,24 +139,34 @@ class FileUploadComponent:
                         print(f"[ERROR] Error in file selection callback: {ex}")
                         import traceback
                         traceback.print_exc()
-                        if self.status_text:
-                            self.status_text.value = f"[ERROR] Error: {str(ex)}"
-                            self.status_text.color = "red"
-                            self.status_text.update()
+                        if self.status_text and self._page:
+                            try:
+                                self.status_text.value = f"[ERROR] Error: {str(ex)}"
+                                self.status_text.color = "red"
+                                self.status_text.update()
+                            except AssertionError:
+                                # Status text not on page
+                                pass
             elif file_path:
                 # Path provided but file doesn't exist
                 print(f"[WARNING] File path provided but file doesn't exist: {file_path}")
-                if self.status_text:
-                    self.status_text.value = f"[ERROR] File not found at path"
-                    self.status_text.color = "red"
-                    self.status_text.update()
+                if self.status_text and self._page:
+                    try:
+                        self.status_text.value = f"[ERROR] File not found at path"
+                        self.status_text.color = "red"
+                        self.status_text.update()
+                    except AssertionError:
+                        pass
             else:
                 # No file path available
                 print(f"[WARNING] No file path available")
-                if self.status_text:
-                    self.status_text.value = f"[ERROR] Could not get file path"
-                    self.status_text.color = "red"
-                    self.status_text.update()
+                if self.status_text and self._page:
+                    try:
+                        self.status_text.value = f"[ERROR] Could not get file path"
+                        self.status_text.color = "red"
+                        self.status_text.update()
+                    except AssertionError:
+                        pass
         elif e.path:
             # Sometimes Flet provides path directly
             print(f"[DEBUG] Using path directly from result: {e.path}")

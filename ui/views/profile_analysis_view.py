@@ -279,11 +279,17 @@ class ProfileAnalysisView:
             ], spacing=10, expand=True)
         ], spacing=0, expand=True)
         
-        return ft.Container(
+        container = ft.Container(
             content=content,
             padding=10,
             expand=True
         )
+        
+        # Restore analysis results if they exist (for persistence)
+        if self.analysis_result:
+            self._show_results(self.analysis_result)
+        
+        return container
     
     def _on_jd_mode_change(self, e):
         """Handle JD input mode toggle"""
