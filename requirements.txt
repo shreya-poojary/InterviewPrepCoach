@@ -28,3 +28,11 @@ python-dotenv==1.0.1
 # Utilities
 validators==0.22.0
 python-dateutil==2.8.2
+
+# Audio/Video Recording
+sounddevice==0.4.6
+soundfile==0.12.1
+opencv-python==4.9.0.80
+numpy==1.26.4
+# Speech-to-text (using OpenAI Whisper API or local)
+openai-whisper==20231117

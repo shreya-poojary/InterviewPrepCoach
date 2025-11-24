@@ -77,14 +77,16 @@ def main(page: ft.Page):
                 nav_index = 2
             elif route == "/practice":
                 if route not in view_cache:
-                    view_cache[route] = PlaceholderView(
-                        page,
-                        "Practice Sessions",
-                        "Practice interviews with AI feedback in written, audio, or video mode",
-                        ft.Icons.PLAY_CIRCLE
-                    )
+                    from ui.views.practice_view import PracticeView
+                    view_cache[route] = PracticeView(page)
                 view = view_cache[route]
                 nav_index = 3
+            elif route == "/mock-interview":
+                if route not in view_cache:
+                    from ui.views.mock_interview_view import MockInterviewView
+                    view_cache[route] = MockInterviewView(page)
+                view = view_cache[route]
+                nav_index = 3  # Share same nav index or create new
             elif route == "/opportunities":
                 if route not in view_cache:
                     view_cache[route] = OpportunitiesView(page)
@@ -159,6 +161,7 @@ def main(page: ft.Page):
             "/profile_analysis",
             "/questions",
             "/practice",
+            "/mock-interview",
             "/opportunities",
             "/writer",
             "/planner",
