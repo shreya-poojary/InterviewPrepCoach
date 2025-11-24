@@ -13,7 +13,11 @@ class SettingsView:
     def __init__(self, page: ft.Page):
         self.page = page
         self.user_id = SessionManager.get_user_id()
-        self.llm_service = LLMService.get_instance()
+        try:
+            self.llm_service = LLMService.get_instance()
+        except Exception as e:
+            print(f"[WARNING] Could not initialize LLMService: {e}")
+            self.llm_service = None
         
     def build(self) -> ft.Container:
         """Build settings view"""
@@ -226,6 +230,14 @@ class SettingsView:
     def _load_current_settings(self):
         """Load current LLM settings"""
         try:
+            if not self.llm_service:
+                # If LLM service not available, set defaults
+                self.provider_dropdown.value = "ollama"
+                self._update_provider_options("ollama")
+                if self.model_dropdown.options:
+                    self.model_dropdown.value = self.model_dropdown.options[0].key
+                return
+            
             settings = self.llm_service.get_user_llm_settings(self.user_id)
             
             if settings:
@@ -515,9 +527,14 @@ class SettingsView:
             
             print(f"[DEBUG] Test response received: {response[:200] if response else 'None'}")
             
+            # Re-enable button before checking response
+            self.test_button.text = "Test Connection"
+            self.test_button.disabled = False
+            
             # Check if response contains error indicators
             if not response:
                 self._show_error("❌ No response received from provider")
+                self.page.update()
                 print(f"[DEBUG] Test connection failed: No response")
             elif "error" in response.lower() or "Error:" in response:
                 # Extract error message
@@ -534,8 +551,14 @@ class SettingsView:
                     # Show first 100 chars of error
                     error_display = error_msg[:100] + "..." if len(error_msg) > 100 else error_msg
                     self._show_error(f"❌ Connection failed: {error_display}")
+                self.page.update()
                 print(f"[DEBUG] Test connection failed: {error_msg}")
             else:
+                # Re-enable button first (before showing dialog)
+                self.test_button.text = "Test Connection"
+                self.test_button.disabled = False
+                
+                # Show success message (this will update the page with dialog)
                 self._show_success("✅ Connection successful! Provider is working correctly.")
                 print(f"[DEBUG] Test connection successful: {response[:50]}")
                 
@@ -641,10 +664,29 @@ class SettingsView:
                 ],
                 modal=True
             )
+            # Check if page is still valid
+            if not hasattr(self, 'page') or self.page is None:
+                print("[WARNING] Page is not available, skipping success message")
+                return
+            
+            # Set dialog and open it
             self.page.dialog = success_dialog
             success_dialog.open = True
-            self.page.update()
             print(f"[DEBUG] Success dialog opened")
+            
+            # Safely update page - use try/except to handle event loop issues
+            try:
+                if hasattr(self.page, 'update'):
+                    self.page.update()
+                    print(f"[DEBUG] Page updated after showing success dialog")
+            except RuntimeError as e:
+                if "Event loop is closed" in str(e):
+                    print("[WARNING] Event loop is closed, but dialog should still be visible")
+                    # Dialog is already set, so it should appear on next interaction
+                else:
+                    print(f"[WARNING] Error updating page: {e}")
+            except Exception as e:
+                print(f"[WARNING] Unexpected error updating page: {e}")
             
             # Secondary: Update status container if it exists
             if hasattr(self, 'status_container') and hasattr(self, 'status_text'):
@@ -673,8 +715,6 @@ class SettingsView:
                 self.page.snack_bar.open = True
             except:
                 pass
-            
-            self.page.update()
         except Exception as ex:
             print(f"[ERROR] Failed to show success message: {ex}")
             import traceback

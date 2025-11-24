@@ -13,6 +13,20 @@ class QuestionsView:
         self.page = page
         self.user_id = SessionManager.get_user_id()
         self.current_questions = []
+        self.jd_dropdown = None  # Will be set in build
+        
+    def _refresh_jd_dropdown(self):
+        """Refresh JD dropdown with latest JDs"""
+        if self.jd_dropdown:
+            from services.jd_service import JobDescriptionService
+            jds = JobDescriptionService.get_user_job_descriptions(self.user_id) or []
+            self.jd_dropdown.options = [
+                ft.dropdown.Option(str(jd['jd_id']), jd.get('job_title', 'Job')) 
+                for jd in jds
+            ]
+            self.jd_dropdown.disabled = len(jds) == 0
+            self.jd_dropdown.hint_text = "Choose a job description" if jds else "Add a job description first"
+            self.jd_dropdown.update()
         
     def build(self) -> ft.Container:
         """Build the questions view"""

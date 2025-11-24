@@ -226,6 +226,29 @@ class OpportunitiesView:
             
             print(f"[DEBUG] save_jd_from_jsearch returned: {jd_id} (type: {type(jd_id)})")
             
+            # Also mark job as saved in jsearch_jobs if it exists there
+            try:
+                from services.jsearch_service import JSearchService
+                # Try to find and mark the job as saved
+                external_job_id = job.get('job_id') or job.get('external_job_id')
+                if external_job_id:
+                    # Check if job exists in jsearch_jobs
+                    saved_job = JSearchService.get_job_by_external_id(external_job_id)
+                    if saved_job and saved_job.get('job_id'):
+                        # Mark as saved
+                        JSearchService.save_job(saved_job['job_id'], is_saved=True)
+                        print(f"[DEBUG] Marked job {saved_job['job_id']} as saved in jsearch_jobs")
+                    else:
+                        # Job doesn't exist in jsearch_jobs yet, save it first
+                        saved_job_result = JSearchService._save_job(self.user_id, job)
+                        if saved_job_result and saved_job_result.get('job_id'):
+                            JSearchService.save_job(saved_job_result['job_id'], is_saved=True)
+                            print(f"[DEBUG] Saved and marked job {saved_job_result['job_id']} as saved in jsearch_jobs")
+            except Exception as e:
+                print(f"[WARNING] Could not mark job as saved in jsearch_jobs: {e}")
+                import traceback
+                traceback.print_exc()
+            
             if jd_id and jd_id > 0:
                 # Show success dialog (more visible than snackbar)
                 job_title = job.get('job_title', job.get('title', 'Job'))

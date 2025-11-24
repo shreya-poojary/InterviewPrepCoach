@@ -144,21 +144,46 @@ class LLMService:
                 api_key_encrypted = Encryption.encrypt(api_key)
             
             with DatabaseManager.get_cursor() as cursor:
-                # Deactivate current settings
+                # Check if settings already exist for this user-provider combination
                 cursor.execute("""
-                    UPDATE llm_settings
-                    SET is_active = FALSE
-                    WHERE user_id = %s
-                """, (user_id,))
+                    SELECT id FROM llm_settings
+                    WHERE user_id = %s AND provider = %s
+                """, (user_id, provider))
+                existing = cursor.fetchone()
                 
-                # Insert new settings
-                cursor.execute("""
-                    INSERT INTO llm_settings
-                    (user_id, provider, model_name, api_key_encrypted, endpoint_url,
-                     temperature, max_tokens, is_active)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
-                """, (user_id, provider, model_name, api_key_encrypted, endpoint_url,
-                      temperature, max_tokens))
+                if existing:
+                    # Update existing settings
+                    cursor.execute("""
+                        UPDATE llm_settings
+                        SET model = %s, model_name = %s, api_key_encrypted = %s, 
+                            endpoint_url = %s, temperature = %s, max_tokens = %s,
+                            is_active = TRUE, updated_at = NOW()
+                        WHERE user_id = %s AND provider = %s
+                    """, (model_name, model_name, api_key_encrypted, endpoint_url,
+                          temperature, max_tokens, user_id, provider))
+                    
+                    # Deactivate other settings for this user
+                    cursor.execute("""
+                        UPDATE llm_settings
+                        SET is_active = FALSE
+                        WHERE user_id = %s AND provider != %s
+                    """, (user_id, provider))
+                else:
+                    # Deactivate current settings
+                    cursor.execute("""
+                        UPDATE llm_settings
+                        SET is_active = FALSE
+                        WHERE user_id = %s
+                    """, (user_id,))
+                    
+                    # Insert new settings
+                    cursor.execute("""
+                        INSERT INTO llm_settings
+                        (user_id, provider, model, model_name, api_key_encrypted, endpoint_url,
+                         temperature, max_tokens, is_active)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                    """, (user_id, provider, model_name, model_name, api_key_encrypted, endpoint_url,
+                          temperature, max_tokens))
             
             return True
         except Exception as e:

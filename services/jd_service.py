@@ -58,17 +58,23 @@ class JobDescriptionService:
             
             query = """
                 INSERT INTO job_descriptions
-                (user_id, source_type, file_path, company_name, job_title,
-                 jd_text, parsed_requirements)
-                VALUES (%s, 'upload', %s, %s, %s, %s, %s)
+                (user_id, source_type, file_path, company_name, job_title, title,
+                 jd_text, description_text, parsed_requirements)
+                VALUES (%s, 'upload', %s, %s, %s, %s, %s, %s, %s)
             """
             jd_id = execute_query(
                 query,
-                (user_id, str(file_path), company_name, job_title,
-                 jd_text, json.dumps(parsed_requirements)),
+                (user_id, str(file_path), company_name, job_title, job_title or "Job Position",
+                 jd_text, jd_text, json.dumps(parsed_requirements)),
                 commit=True
             )
-            
+            # Sync jd_id column with id for code compatibility
+            if jd_id:
+                execute_query(
+                    "UPDATE job_descriptions SET jd_id = id WHERE id = %s",
+                    (jd_id,),
+                    commit=True
+                )
             print(f"[INFO] JD saved from file with ID: {jd_id}")
             return jd_id
         
@@ -110,17 +116,23 @@ class JobDescriptionService:
             # Use execute_query instead of get_cursor for consistency
             query = """
                 INSERT INTO job_descriptions
-                (user_id, source_type, company_name, job_title, job_url,
-                 jd_text, parsed_requirements)
-                VALUES (%s, 'paste', %s, %s, %s, %s, %s)
+                (user_id, source_type, company_name, job_title, title, job_url,
+                 jd_text, description_text, parsed_requirements)
+                VALUES (%s, 'paste', %s, %s, %s, %s, %s, %s, %s)
             """
             jd_id = execute_query(
                 query,
-                (user_id, company_name, job_title, job_url,
-                 jd_text, json.dumps(parsed_requirements)),
+                (user_id, company_name, job_title, job_title or "Job Position", job_url,
+                 jd_text, jd_text, json.dumps(parsed_requirements)),
                 commit=True
             )
-            
+            # Sync jd_id column with id for code compatibility
+            if jd_id:
+                execute_query(
+                    "UPDATE job_descriptions SET jd_id = id WHERE id = %s",
+                    (jd_id,),
+                    commit=True
+                )
             print(f"[INFO] JD saved from text with ID: {jd_id}")
             return jd_id
         
@@ -192,14 +204,14 @@ class JobDescriptionService:
             # Match migration schema exactly (001_initial_schema.sql)
             query = """
                 INSERT INTO job_descriptions
-                (user_id, source_type, company_name, job_title, location,
-                 job_type, remote_type, jd_text, parsed_requirements,
+                (user_id, source_type, company_name, job_title, title, location,
+                 job_type, remote_type, jd_text, description_text, parsed_requirements,
                  external_job_id, job_url, salary_min, salary_max)
-                VALUES (%s, 'jsearch', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, 'jsearch', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             
-            params = (user_id, company_name, job_title, location, job_type, remote_type,
-                     jd_text, json.dumps(parsed_requirements), external_job_id, job_url,
+            params = (user_id, company_name, job_title, job_title or "Job Position", location, job_type, remote_type,
+                     jd_text, jd_text, json.dumps(parsed_requirements), external_job_id, job_url,
                      salary_min, salary_max)
             
             print(f"[DEBUG] Executing query with {len(params)} parameters")
@@ -214,6 +226,10 @@ class JobDescriptionService:
                 cursor.execute(query, params)
                 conn.commit()
                 jd_id = cursor.lastrowid
+                # Sync jd_id column with id for code compatibility
+                if jd_id:
+                    cursor.execute("UPDATE job_descriptions SET jd_id = id WHERE id = %s", (jd_id,))
+                    conn.commit()
                 cursor.close()
                 conn.close()
                 

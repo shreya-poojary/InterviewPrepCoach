@@ -1,8 +1,9 @@
 """Application Planner View"""
 
 import flet as ft
-from typing import Optional
+from typing import Optional, List, Dict
 from services.application_service import ApplicationService
+from services.jsearch_service import JSearchService
 from core.auth import SessionManager
 from datetime import datetime
 
@@ -50,16 +51,20 @@ class PlannerView:
             ft.TextButton("Rejected", on_click=lambda _: self.filter_applications('rejected')),
         ], spacing=5, wrap=True)
         
-        # Applications list
-        if not hasattr(self, 'applications_container'):
-            self.applications_container = ft.Column(
-                scroll=ft.ScrollMode.AUTO,
-                spacing=10,
-                expand=True
-            )
+        # Applications list - always initialize
+        self.applications_container = ft.Column(
+            scroll=ft.ScrollMode.AUTO,
+            spacing=10,
+            expand=True
+        )
         
-        # Load applications
-        self.load_applications()
+        # Load applications after container is created
+        try:
+            self.load_applications()
+        except Exception as e:
+            print(f"[ERROR] Error in build() while loading applications: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Main layout
         content = ft.Column([
@@ -83,9 +88,13 @@ class PlannerView:
         stats = ApplicationService.get_stats_by_status(self.user_id)
         total_stats = ApplicationService.get_application_stats(self.user_id)
         
+        # Count saved jobs from job search
+        saved_jobs_count = len(JSearchService.get_saved_jobs(self.user_id) or [])
+        total_saved = stats.get('saved', 0) + saved_jobs_count
+        
         return ft.Row([
-            self.build_stat_card("Total", total_stats.get('total', 0), ft.Icons.APPS, ft.Colors.BLUE),
-            self.build_stat_card("Saved", stats.get('saved', 0), ft.Icons.BOOKMARK, ft.Colors.GREY),
+            self.build_stat_card("Total", total_stats.get('total', 0) + saved_jobs_count, ft.Icons.APPS, ft.Colors.BLUE),
+            self.build_stat_card("Saved", total_saved, ft.Icons.BOOKMARK, ft.Colors.GREY),
             self.build_stat_card("Applied", stats.get('applied', 0), ft.Icons.SEND, ft.Colors.GREEN),
             self.build_stat_card("Interview", stats.get('interview', 0), ft.Icons.PERSON, ft.Colors.ORANGE),
             self.build_stat_card("Offers", stats.get('offer', 0), ft.Icons.CELEBRATION, ft.Colors.PURPLE),
@@ -109,17 +118,38 @@ class PlannerView:
     def load_applications(self, status: Optional[str] = None):
         """Load and display applications"""
         # Ensure container exists before using it
-        if not hasattr(self, 'applications_container'):
+        if not hasattr(self, 'applications_container') or self.applications_container is None:
             print(f"[DEBUG] applications_container not initialized yet, skipping load")
             return
         
-        self.applications_container.controls.clear()
+        # Clear existing controls
+        try:
+            self.applications_container.controls.clear()
+        except Exception as e:
+            print(f"[WARNING] Error clearing container: {e}")
+            # Try to reinitialize
+            self.applications_container = ft.Column(
+                scroll=ft.ScrollMode.AUTO,
+                spacing=10,
+                expand=True
+            )
         
         print(f"[DEBUG] Loading applications for user_id={self.user_id}, status={status}")
         
         try:
             apps = ApplicationService.get_applications(self.user_id, status)
             print(f"[DEBUG] get_applications returned {len(apps) if apps else 0} applications")
+            
+            # If status is 'saved', also include saved jobs from job search
+            if status == 'saved' or status is None:
+                saved_jobs = self._load_saved_jobs()
+                print(f"[DEBUG] Found {len(saved_jobs)} saved jobs from job search")
+                
+                # Convert saved jobs to application format and add to apps list
+                for job in saved_jobs:
+                    app_from_job = self._convert_job_to_application(job)
+                    if app_from_job:
+                        apps.append(app_from_job)
             
             if not apps:
                 self.applications_container.controls.append(
@@ -151,6 +181,44 @@ class PlannerView:
             )
         
         self.page.update()
+    
+    def _load_saved_jobs(self) -> List[Dict]:
+        """Load saved jobs from job search"""
+        try:
+            saved_jobs = JSearchService.get_saved_jobs(self.user_id)
+            return saved_jobs or []
+        except Exception as e:
+            print(f"[ERROR] Error loading saved jobs: {e}")
+            return []
+    
+    def _convert_job_to_application(self, job: Dict) -> Optional[Dict]:
+        """Convert a saved job from jsearch_jobs to application format"""
+        try:
+            # Map jsearch_jobs fields to application format
+            job_title = job.get('title', job.get('job_title', 'Unknown Position'))
+            company_name = job.get('company_name', job.get('company', 'Unknown Company'))
+            
+            return {
+                'application_id': f"job_{job.get('job_id')}",  # Prefix to distinguish from real apps
+                'company_name': company_name,
+                'job_title': job_title,
+                'position': job_title,
+                'location': job.get('location', ''),
+                'status': 'saved',
+                'job_url': job.get('job_url', ''),
+                'salary_min': job.get('salary_min'),
+                'salary_max': job.get('salary_max'),
+                'description': job.get('description', ''),
+                'applied_date': None,
+                'interview_date': None,
+                'notes': f"Saved from job search",
+                'is_from_job_search': True,  # Flag to identify saved jobs
+                'external_job_id': job.get('external_job_id'),
+                'job_id': job.get('job_id')
+            }
+        except Exception as e:
+            print(f"[ERROR] Error converting job to application: {e}")
+            return None
     
     def build_application_card(self, app: dict) -> ft.Card:
         """Build an application card"""
@@ -265,28 +333,37 @@ class PlannerView:
                     
                     ft.Divider(),
                     ft.Row([
+                        # For saved jobs from job search, show "Convert to Application" button
+                        ft.ElevatedButton(
+                            "Convert to Application",
+                            icon=ft.Icons.ADD_TASK,
+                            on_click=lambda _, a=app: self._convert_job_to_application_action(a),
+                            style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN, color=ft.Colors.WHITE, padding=10)
+                        ) if app.get('is_from_job_search') else ft.Container(),
+                        # For regular applications, show standard buttons
                         ft.ElevatedButton(
                             "Update Status",
                             icon=ft.Icons.UPDATE,
                             on_click=lambda _, app_id=app['application_id']: self.show_status_dialog(app_id),
                             style=ft.ButtonStyle(padding=10)
-                        ),
+                        ) if not app.get('is_from_job_search') else ft.Container(),
                         ft.TextButton(
                             "Edit",
                             icon=ft.Icons.EDIT,
                             on_click=lambda _, a=app: self.show_edit_dialog(a)
-                        ),
+                        ) if not app.get('is_from_job_search') else ft.Container(),
                         ft.TextButton(
                             "Delete",
                             icon=ft.Icons.DELETE,
                             on_click=lambda _, app_id=app['application_id']: self.delete_application(app_id)
-                        ),
+                        ) if not app.get('is_from_job_search') else ft.Container(),
+                        # View job URL button (for both types)
                         ft.TextButton(
                             "View URL",
                             icon=ft.Icons.OPEN_IN_NEW,
                             on_click=lambda _, url=app.get('job_url'): self.page.launch_url(url) if url else self.page.update(),
                             disabled=not app.get('job_url')
-                        )
+                        ) if app.get('job_url') else ft.Container()
                     ], spacing=10, wrap=True)
                 ], spacing=15),
                 padding=20
@@ -338,26 +415,25 @@ class PlannerView:
                 print(f"[ERROR] Fallback also failed: {ex2}")
     
     def _close_dialog(self, dialog: ft.AlertDialog):
-        """Close dialog helper - simple and reliable"""
+        """Close dialog - simple and reliable (matches opportunities_view pattern)"""
         try:
-            # Close the dialog
+            print(f"[DEBUG] Closing dialog")
+            # Close dialog first
             dialog.open = False
-            
-            # Clear page.dialog - this removes the modal backdrop
-            if hasattr(self.page, 'dialog'):
-                self.page.dialog = None
-            
-            # Update page to apply changes
+            # Clear page.dialog (this removes modal backdrop)
+            self.page.dialog = None
+            # Update page to reflect changes
             self.page.update()
-            
-            print(f"[DEBUG] Dialog closed")
+            print(f"[DEBUG] Dialog closed successfully")
         except Exception as ex:
-            print(f"[DEBUG] Error closing dialog: {ex}")
+            print(f"[ERROR] Error closing dialog: {ex}")
+            import traceback
+            traceback.print_exc()
+            # Force close as fallback
             try:
-                # Fallback: simple close
-                dialog.open = False
-                if hasattr(self.page, 'dialog'):
-                    self.page.dialog = None
+                if dialog:
+                    dialog.open = False
+                self.page.dialog = None
                 self.page.update()
             except:
                 pass
@@ -465,17 +541,22 @@ class PlannerView:
                 traceback.print_exc()
                 self.show_error(error_msg)
         
-        # Create dialog with simpler structure
-        dialog_content = ft.Column([
-            company_field,
-            job_title_field,
-            location_field,
-            job_url_field,
-            applied_date_field,
-            interview_date_field,
-            salary_field,
-            notes_field
-        ], spacing=15, scroll=ft.ScrollMode.AUTO, tight=True)
+        # Create dialog content - wrap in Container with max height for scrolling
+        dialog_content = ft.Container(
+            content=ft.Column([
+                company_field,
+                job_title_field,
+                location_field,
+                job_url_field,
+                applied_date_field,
+                interview_date_field,
+                salary_field,
+                notes_field
+            ], spacing=15, scroll=ft.ScrollMode.AUTO, tight=True),
+            width=400,
+            height=450,
+            padding=10
+        )
         
         dialog = ft.AlertDialog(
             title=ft.Text("➕ New Application", size=18, weight=ft.FontWeight.BOLD),
@@ -484,32 +565,48 @@ class PlannerView:
                 ft.TextButton("Cancel", on_click=lambda _: self._close_dialog(dialog)),
                 ft.ElevatedButton("Add Application", on_click=save_application, icon=ft.Icons.ADD)
             ],
-            modal=True
+            modal=True,
+            actions_alignment=ft.MainAxisAlignment.END
         )
         
         print(f"[DEBUG] Opening add dialog")
-        # Open dialog with same pattern as working dialogs (status, edit)
+        # Use both page.dialog AND page.overlay to ensure visibility
         try:
-            if hasattr(self.page, 'dialog'):
-                self.page.dialog = dialog
-                dialog.open = True
-                self.page.update()
-                print(f"[DEBUG] Dialog opened via page.dialog")
-            else:
-                if not hasattr(self.page, 'overlay') or self.page.overlay is None:
-                    self.page.overlay = []
-                if dialog not in self.page.overlay:
-                    self.page.overlay.append(dialog)
-                dialog.open = True
-                self.page.update()
-                print(f"[DEBUG] Dialog opened via overlay")
+            # Close any existing dialog first
+            if hasattr(self.page, 'dialog') and self.page.dialog:
+                try:
+                    self.page.dialog.open = False
+                    self.page.dialog = None
+                    self.page.update()
+                except:
+                    pass
+            
+            # Add to overlay first (for rendering)
+            if not hasattr(self.page, 'overlay'):
+                self.page.overlay = []
+            if dialog not in self.page.overlay:
+                self.page.overlay.append(dialog)
+            
+            # Set page.dialog (for modal behavior)
+            self.page.dialog = dialog
+            dialog.open = True
+            
+            # Force update
+            self.page.update()
+            
+            print(f"[DEBUG] Dialog opened, open={dialog.open}, in overlay={dialog in self.page.overlay}, page.dialog={self.page.dialog is not None}")
         except Exception as ex:
             print(f"[ERROR] Failed to open add dialog: {ex}")
             import traceback
             traceback.print_exc()
     
-    def show_status_dialog(self, app_id: int):
+    def show_status_dialog(self, app_id):
         """Show dialog to update application status"""
+        # Handle both int IDs and string IDs (for saved jobs)
+        if isinstance(app_id, str) and app_id.startswith('job_'):
+            self.show_error("Cannot update status of saved jobs. Please convert to application first.")
+            return
+        
         status_dropdown = ft.Dropdown(
             label="New Status",
             options=[
@@ -547,20 +644,29 @@ class PlannerView:
             modal=True
         )
         
-        # Open dialog with fallback
+        # Open dialog - use overlay for visibility
         print(f"[DEBUG] Opening status dialog")
         try:
-            if hasattr(self.page, 'dialog'):
-                self.page.dialog = dialog
-                dialog.open = True
-                self.page.update()
-            else:
-                if not hasattr(self.page, 'overlay') or self.page.overlay is None:
-                    self.page.overlay = []
-                if dialog not in self.page.overlay:
-                    self.page.overlay.append(dialog)
-                dialog.open = True
-                self.page.update()
+            # Close any existing dialog first
+            if hasattr(self.page, 'dialog') and self.page.dialog:
+                try:
+                    self.page.dialog.open = False
+                    self.page.dialog = None
+                    self.page.update()
+                except:
+                    pass
+            
+            # Add to overlay
+            if not hasattr(self.page, 'overlay'):
+                self.page.overlay = []
+            if dialog not in self.page.overlay:
+                self.page.overlay.append(dialog)
+            
+            self.page.dialog = dialog
+            dialog.open = True
+            self.page.update()
+            
+            print(f"[DEBUG] Status dialog opened, open={dialog.open}")
         except Exception as ex:
             print(f"[ERROR] Failed to open status dialog: {ex}")
     
@@ -634,8 +740,15 @@ class PlannerView:
                     self.show_error("Invalid salary. Enter a number.")
                     return
             
+            # Get application_id - handle both real apps and saved jobs
+            app_id = app.get('application_id')
+            if isinstance(app_id, str) and app_id.startswith('job_'):
+                # This is a saved job, not a real application - can't edit
+                self.show_error("Cannot edit saved jobs. Please convert to application first.")
+                return
+            
             if ApplicationService.update_application(
-                app['application_id'],
+                app_id,
                 company_name=company_field.value,
                 job_title=job_title_field.value,
                 location=location_field.value,
@@ -673,25 +786,39 @@ class PlannerView:
             modal=True
         )
         
-        # Open dialog with fallback
+        # Open dialog - use overlay for visibility
         print(f"[DEBUG] Opening edit dialog")
         try:
-            if hasattr(self.page, 'dialog'):
-                self.page.dialog = dialog
-                dialog.open = True
-                self.page.update()
-            else:
-                if not hasattr(self.page, 'overlay') or self.page.overlay is None:
-                    self.page.overlay = []
-                if dialog not in self.page.overlay:
-                    self.page.overlay.append(dialog)
-                dialog.open = True
-                self.page.update()
+            # Close any existing dialog first
+            if hasattr(self.page, 'dialog') and self.page.dialog:
+                try:
+                    self.page.dialog.open = False
+                    self.page.dialog = None
+                    self.page.update()
+                except:
+                    pass
+            
+            # Add to overlay
+            if not hasattr(self.page, 'overlay'):
+                self.page.overlay = []
+            if dialog not in self.page.overlay:
+                self.page.overlay.append(dialog)
+            
+            self.page.dialog = dialog
+            dialog.open = True
+            self.page.update()
+            
+            print(f"[DEBUG] Edit dialog opened, open={dialog.open}")
         except Exception as ex:
             print(f"[ERROR] Failed to open edit dialog: {ex}")
     
-    def delete_application(self, app_id: int):
+    def delete_application(self, app_id):
         """Delete an application with confirmation"""
+        # Handle both int IDs and string IDs (for saved jobs)
+        if isinstance(app_id, str) and app_id.startswith('job_'):
+            self.show_error("Cannot delete saved jobs. They are from job search.")
+            return
+        
         def confirm_delete(e):
             if ApplicationService.delete_application(app_id):
                 self._close_dialog(dialog)
@@ -710,20 +837,29 @@ class PlannerView:
             modal=True
         )
         
-        # Open dialog with fallback
+        # Open dialog - use overlay for visibility
         print(f"[DEBUG] Opening delete confirmation dialog")
         try:
-            if hasattr(self.page, 'dialog'):
-                self.page.dialog = dialog
-                dialog.open = True
-                self.page.update()
-            else:
-                if not hasattr(self.page, 'overlay') or self.page.overlay is None:
-                    self.page.overlay = []
-                if dialog not in self.page.overlay:
-                    self.page.overlay.append(dialog)
-                dialog.open = True
-                self.page.update()
+            # Close any existing dialog first
+            if hasattr(self.page, 'dialog') and self.page.dialog:
+                try:
+                    self.page.dialog.open = False
+                    self.page.dialog = None
+                    self.page.update()
+                except:
+                    pass
+            
+            # Add to overlay
+            if not hasattr(self.page, 'overlay'):
+                self.page.overlay = []
+            if dialog not in self.page.overlay:
+                self.page.overlay.append(dialog)
+            
+            self.page.dialog = dialog
+            dialog.open = True
+            self.page.update()
+            
+            print(f"[DEBUG] Delete dialog opened, open={dialog.open}")
         except Exception as ex:
             print(f"[ERROR] Failed to open delete dialog: {ex}")
     
@@ -732,6 +868,131 @@ class PlannerView:
         self.page.snack_bar = ft.SnackBar(content=ft.Text(message), bgcolor=ft.Colors.RED_400)
         self.page.snack_bar.open = True
         self.page.update()
+    
+    def _convert_job_to_application_action(self, job_app: dict):
+        """Convert a saved job to a real application"""
+        try:
+            # Pre-fill the add dialog with job data
+            self.show_add_dialog_from_job(job_app)
+        except Exception as e:
+            print(f"[ERROR] Error converting job to application: {e}")
+            import traceback
+            traceback.print_exc()
+            self.show_error(f"Error converting job: {str(e)}")
+    
+    def _open_job_url(self, url: str):
+        """Open job URL in browser"""
+        try:
+            import webbrowser
+            webbrowser.open(url)
+        except Exception as e:
+            print(f"[ERROR] Error opening URL: {e}")
+            self.show_error("Could not open job URL")
+    
+    def show_add_dialog_from_job(self, job_app: dict):
+        """Show add dialog pre-filled with job data"""
+        # Use the existing show_add_dialog but pre-fill with job data
+        # We'll modify the dialog after it's created
+        dialog = ft.AlertDialog(
+            title=ft.Text("Convert to Application", size=18, weight=ft.FontWeight.BOLD),
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("Convert this saved job to a tracked application:", size=14),
+                    ft.TextField(
+                        label="Company",
+                        value=job_app.get('company_name', ''),
+                        width=400
+                    ),
+                    ft.TextField(
+                        label="Position",
+                        value=job_app.get('job_title', ''),
+                        width=400
+                    ),
+                    ft.TextField(
+                        label="Location",
+                        value=job_app.get('location', ''),
+                        width=400
+                    ),
+                    ft.TextField(
+                        label="Job URL",
+                        value=job_app.get('job_url', ''),
+                        width=400
+                    ),
+                ], spacing=15, tight=True, scroll=ft.ScrollMode.AUTO),
+                width=450,
+                height=400
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: self._close_dialog(dialog)),
+                ft.ElevatedButton(
+                    "Create Application",
+                    on_click=lambda e: self._create_application_from_job(dialog, job_app),
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN, color=ft.Colors.WHITE)
+                )
+            ],
+            modal=True
+        )
+        
+        # Store references to input fields
+        dialog.company_field = dialog.content.content.controls[1]
+        dialog.position_field = dialog.content.content.controls[2]
+        dialog.location_field = dialog.content.content.controls[3]
+        dialog.url_field = dialog.content.content.controls[4]
+        
+        # Close any existing dialog first
+        if hasattr(self.page, 'dialog') and self.page.dialog:
+            self.page.dialog.open = False
+        
+        # Add to overlay for visibility
+        if not hasattr(self.page, 'overlay'):
+            self.page.overlay = []
+        if dialog not in self.page.overlay:
+            self.page.overlay.append(dialog)
+        
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+        
+        # Verify dialog is open
+        if not dialog.open:
+            dialog.open = True
+            self.page.update()
+    
+    def _create_application_from_job(self, dialog: ft.AlertDialog, job_app: dict):
+        """Create application from saved job"""
+        try:
+            company = dialog.company_field.value.strip()
+            position = dialog.position_field.value.strip()
+            location = dialog.location_field.value.strip()
+            job_url = dialog.url_field.value.strip()
+            
+            if not company or not position:
+                self.show_error("Company and Position are required")
+                return
+            
+            # Create application (position parameter doesn't exist, only job_title)
+            app_id = ApplicationService.create_application(
+                user_id=self.user_id,
+                company_name=company,
+                job_title=position,
+                location=location if location else None,
+                job_url=job_url if job_url else None,
+                status='saved',
+                notes=f"Converted from saved job search result"
+            )
+            
+            if app_id:
+                self._close_dialog(dialog)
+                self.load_applications(self.selected_status_filter)
+                self._refresh_stats()
+                self.show_success("✅ Application created from saved job!")
+            else:
+                self.show_error("Failed to create application")
+        except Exception as e:
+            print(f"[ERROR] Error creating application from job: {e}")
+            import traceback
+            traceback.print_exc()
+            self.show_error(f"Error: {str(e)}")
     
     def show_success(self, message: str):
         """Show success snackbar"""

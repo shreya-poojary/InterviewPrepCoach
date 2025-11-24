@@ -212,13 +212,16 @@ class OllamaProvider(BaseLLMProvider):
             full_prompt = prompt
             if system_prompt:
                 # Prepend system prompt, but keep it concise
-                system_truncated = system_prompt[:500] if len(system_prompt) > 500 else system_prompt
+                system_truncated = system_prompt[:300] if len(system_prompt) > 300 else system_prompt
                 full_prompt = f"{system_truncated}\n\n{prompt}"
             
-            # Limit total prompt length to prevent 500 errors
-            if len(full_prompt) > 2000:
-                # Keep first 1500 chars and last 500 chars
-                full_prompt = full_prompt[:1500] + "\n...\n" + full_prompt[-500:]
+            # Limit total prompt length to prevent 500 errors (Ollama can be sensitive to long prompts)
+            # Use a more conservative limit for better reliability
+            max_prompt_length = 1500
+            if len(full_prompt) > max_prompt_length:
+                # Keep first 1000 chars and last 500 chars, preserving context
+                full_prompt = full_prompt[:1000] + "\n\n[... content truncated ...]\n\n" + full_prompt[-500:]
+                print(f"[WARNING] Prompt truncated from {len(prompt)} to {len(full_prompt)} chars")
             
             # Prepare request payload
             payload = {
@@ -230,7 +233,8 @@ class OllamaProvider(BaseLLMProvider):
             # Add optional parameters only if they're set
             if self.temperature is not None:
                 payload["options"] = {
-                    "temperature": self.temperature
+                    "temperature": self.temperature,
+                    "num_predict": 2000  # Limit output tokens to prevent memory issues
                 }
             
             print(f"[DEBUG] Ollama request: model={self.model_name}, prompt_length={len(full_prompt)}")
@@ -240,6 +244,19 @@ class OllamaProvider(BaseLLMProvider):
                 json=payload,
                 timeout=180
             )
+            
+            # Check for errors before parsing JSON
+            if response.status_code != 200:
+                error_detail = "Unknown error"
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('error', {}).get('message', str(error_json))
+                except:
+                    error_detail = response.text[:200] if hasattr(response, 'text') else str(response.status_code)
+                
+                error_msg = f"Ollama server error {response.status_code}: {error_detail}"
+                print(f"[ERROR] {error_msg}")
+                return f"Error: {error_msg}"
             
             response.raise_for_status()
             result = response.json()
@@ -255,7 +272,15 @@ class OllamaProvider(BaseLLMProvider):
             print(f"[ERROR] {error_msg}")
             return f"Error: {error_msg}"
         except requests.exceptions.HTTPError as e:
-            error_msg = f"Ollama server error: {e.response.status_code if hasattr(e, 'response') else str(e)}"
+            error_detail = "Unknown error"
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_json = e.response.json()
+                    error_detail = error_json.get('error', {}).get('message', str(error_json))
+                except:
+                    error_detail = e.response.text[:200] if hasattr(e.response, 'text') else str(e.response.status_code)
+            
+            error_msg = f"Ollama server error: {e.response.status_code if hasattr(e, 'response') and e.response else 'Unknown'}: {error_detail}"
             print(f"[ERROR] {error_msg}")
             return f"Error: {error_msg}"
         except Exception as e:
@@ -320,7 +345,6 @@ class OllamaProvider(BaseLLMProvider):
                 elif json_start == -1:
                     # No JSON found, try to extract from common patterns
                     # Look for "Here are..." or similar intro text followed by JSON
-                    import re
                     # Try to find JSON array or object after colon or newline
                     json_match = re.search(r'[:\n]\s*(\[[\s\S]*\]|\{[\s\S]*\})', response_text)
                     if json_match:
@@ -331,6 +355,41 @@ class OllamaProvider(BaseLLMProvider):
             response_text = self._strip_json_comments(response_text)
             response_text = response_text.strip()
             
+            # Fix invalid control characters (unescaped newlines, tabs, etc. in strings)
+            # This is a common issue with LLM-generated JSON
+            def fix_control_chars(text):
+                """Fix unescaped control characters in JSON strings"""
+                result = []
+                in_string = False
+                escape_next = False
+                i = 0
+                while i < len(text):
+                    char = text[i]
+                    if escape_next:
+                        result.append(char)
+                        escape_next = False
+                    elif char == '\\':
+                        result.append(char)
+                        escape_next = True
+                    elif char == '"':
+                        in_string = not in_string
+                        result.append(char)
+                    elif in_string and char in ['\n', '\r', '\t']:
+                        # Escape control characters in strings
+                        if char == '\n':
+                            result.append('\\n')
+                        elif char == '\r':
+                            result.append('\\r')
+                        elif char == '\t':
+                            result.append('\\t')
+                    else:
+                        result.append(char)
+                    i += 1
+                return ''.join(result)
+            
+            # Fix control characters before parsing
+            response_text = fix_control_chars(response_text)
+            
             # Try parsing
             try:
                 return json.loads(response_text)
@@ -340,7 +399,8 @@ class OllamaProvider(BaseLLMProvider):
                 
                 # Try to repair common issues
                 try:
-                    repaired = response_text
+                    # First fix control characters
+                    repaired = fix_control_chars(response_text)
                     
                     # Fix missing opening quotes: , word" -> , "word" (most common issue)
                     repaired = re.sub(r',\s*([A-Za-z_][A-Za-z0-9_/() ]+?)"', r', "\1"', repaired)

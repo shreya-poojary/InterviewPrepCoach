@@ -172,7 +172,15 @@ class JSearchService:
             )
             
             if existing:
-                return JSearchService.get_job_by_id(existing['job_id'])
+                # Mark as saved when saving
+                db_job_id = existing['job_id']
+                # Mark as saved
+                execute_query(
+                    "UPDATE jsearch_jobs SET is_saved = TRUE WHERE job_id = %s",
+                    (db_job_id,),
+                    commit=True
+                )
+                return JSearchService.get_job_by_id(db_job_id)
             
             # Extract salary info
             salary_min = None
@@ -191,12 +199,12 @@ class JSearchService:
             # Map to migration schema structure (001_initial_schema.sql)
             query = """
             INSERT INTO jsearch_jobs 
-            (external_job_id, job_title, company_name, location, description, 
+            (user_id, external_job_id, title, company_name, location, description, 
              salary_min, salary_max, job_url, posted_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             
-            job_title = job_data.get('job_title', 'Unknown Position')
+            job_title = job_data.get('job_title', job_data.get('title', 'Unknown Position'))
             company_name = job_data.get('employer_name', 'Unknown Company')
             location = job_data.get('job_city', job_data.get('job_country', ''))
             description = job_data.get('job_description', '')
@@ -226,10 +234,18 @@ class JSearchService:
             
             db_job_id = execute_query(
                 query,
-                (external_job_id, job_title, company_name, location, description,
+                (user_id, external_job_id, job_title, company_name, location, description,
                  salary_min, salary_max, job_url, posted_date),
                 commit=True
             )
+            
+            # Mark as saved when saving from search results
+            if db_job_id:
+                execute_query(
+                    "UPDATE jsearch_jobs SET is_saved = TRUE WHERE job_id = %s",
+                    (db_job_id,),
+                    commit=True
+                )
             
             return JSearchService.get_job_by_id(db_job_id)
             
@@ -238,17 +254,41 @@ class JSearchService:
             return None
     
     @staticmethod
+    def get_job_by_external_id(external_job_id: str) -> Optional[Dict]:
+        """Get job by external_job_id"""
+        query = "SELECT * FROM jsearch_jobs WHERE external_job_id = %s"
+        result = execute_query(query, (external_job_id,), fetch_one=True)
+        if result:
+            # Map migration schema columns to expected format
+            job_title = result.get('title', result.get('job_title', 'Unknown Position'))
+            return {
+                'job_id': result.get('job_id'),
+                'external_job_id': result.get('external_job_id'),
+                'title': job_title,
+                'job_title': job_title,
+                'company': result.get('company_name'),
+                'company_name': result.get('company_name'),
+                'location': result.get('location'),
+                'description': result.get('description'),
+                'job_url': result.get('job_url'),
+                'is_saved': result.get('is_saved', False)
+            }
+        return None
+    
+    @staticmethod
     def get_job_by_id(db_job_id: int) -> Optional[Dict]:
         """Get job by database job_id (migration schema)"""
         query = "SELECT * FROM jsearch_jobs WHERE job_id = %s"
         result = execute_query(query, (db_job_id,), fetch_one=True)
         if result:
             # Map migration schema columns to expected format
+            # Schema uses 'title', not 'job_title'
+            job_title = result.get('title', result.get('job_title', 'Unknown Position'))
             return {
                 'id': result.get('job_id'),  # Primary key
                 'job_id': result.get('external_job_id'),  # External job ID from API
-                'title': result.get('job_title'),
-                'job_title': result.get('job_title'),
+                'title': job_title,
+                'job_title': job_title,
                 'company': result.get('company_name'),
                 'company_name': result.get('company_name'),
                 'employer_name': result.get('company_name'),

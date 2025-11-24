@@ -1,4 +1,5 @@
 ﻿# Interview Prep AI - Dependencies
+# Python 3.8+ required
 
 # UI Framework
 flet==0.21.2
@@ -29,10 +30,11 @@ python-dotenv==1.0.1
 validators==0.22.0
 python-dateutil==2.8.2
 
-# Audio/Video Recording
+# Audio/Video Recording & Processing
 sounddevice==0.4.6
 soundfile==0.12.1
 opencv-python==4.9.0.80
 numpy==1.26.4
-# Speech-to-text (using OpenAI Whisper API or local)
+
+# Speech-to-text (OpenAI Whisper - local model)
 openai-whisper==20231117

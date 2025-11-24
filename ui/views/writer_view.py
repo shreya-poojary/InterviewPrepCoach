@@ -20,6 +20,37 @@ class WriterView:
         self.selected_resume_id = None
         self.resume_uploader = None
         self.save_file_picker = None
+        self.resume_jd_dropdown = None
+        self.cover_letter_jd_dropdown = None
+        self.cold_email_jd_dropdown = None
+        
+    def _refresh_jd_dropdowns(self):
+        """Refresh all JD dropdowns with latest JDs"""
+        from services.jd_service import JobDescriptionService
+        jds = JobDescriptionService.get_user_job_descriptions(self.user_id) or []
+        jd_options = [
+            ft.dropdown.Option(str(jd['jd_id']), 
+                f"{jd.get('company_name', 'Company')} - {jd.get('job_title', 'Position')}") 
+            for jd in jds
+        ]
+        
+        if self.resume_jd_dropdown:
+            self.resume_jd_dropdown.options = jd_options.copy()
+            self.resume_jd_dropdown.disabled = len(jds) == 0
+            self.resume_jd_dropdown.hint_text = "Choose a JD" if jds else "Add a job description first"
+            self.resume_jd_dropdown.update()
+            
+        if self.cover_letter_jd_dropdown:
+            self.cover_letter_jd_dropdown.options = jd_options.copy()
+            self.cover_letter_jd_dropdown.disabled = len(jds) == 0
+            self.cover_letter_jd_dropdown.hint_text = "Choose a JD" if jds else "Add a job description first"
+            self.cover_letter_jd_dropdown.update()
+            
+        if self.cold_email_jd_dropdown:
+            self.cold_email_jd_dropdown.options = (
+                [ft.dropdown.Option("", "None")] + jd_options.copy()
+            )
+            self.cold_email_jd_dropdown.update()
         
     def build(self) -> ft.Container:
         """Build writer view"""

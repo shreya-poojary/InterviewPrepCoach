@@ -66,16 +66,24 @@ class ResumeService:
             # Insert into database
             query = """
             INSERT INTO resumes 
-            (user_id, file_name, file_path, file_type, resume_text, parsed_data, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (user_id, file_name, file_path, file_type, resume_text, extracted_text, parsed_data, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
             
             resume_id = execute_query(
                 query,
                 (user_id, display_name, saved_path, file_info['type'], 
-                 text, json.dumps(parsed_data), True),
+                 text, text, json.dumps(parsed_data), True),
                 commit=True
             )
+            
+            # Sync resume_id column with id for code compatibility
+            if resume_id:
+                execute_query(
+                    "UPDATE resumes SET resume_id = id WHERE id = %s",
+                    (resume_id,),
+                    commit=True
+                )
             
             # Mark other resumes as inactive
             execute_query(

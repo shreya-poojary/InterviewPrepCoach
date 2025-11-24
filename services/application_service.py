@@ -27,12 +27,14 @@ class ApplicationService:
             
             query = """
                 INSERT INTO applications 
-                (user_id, company_name, job_title, job_url, location, jd_id, status, notes, 
+                (user_id, company, company_name, job_title, position, job_url, location, jd_id, status, notes, 
                  applied_date, interview_date, salary_offered, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             """
             
-            params = (user_id, company_name, job_title, job_url, location, jd_id, status, notes,
+            # Both 'company' and 'company_name' are required - use company_name for both
+            # Also set position to job_title for consistency
+            params = (user_id, company_name, company_name, job_title, job_title, job_url, location, jd_id, status, notes,
                      applied_date, interview_date, salary_offered)
             
             print(f"[DEBUG] Executing query with {len(params)} parameters")
@@ -46,6 +48,15 @@ class ApplicationService:
                 cursor.execute(query, params)
                 conn.commit()
                 application_id = cursor.lastrowid
+                
+                # Sync application_id column with id for code compatibility
+                if application_id:
+                    cursor.execute(
+                        "UPDATE applications SET application_id = id WHERE id = %s",
+                        (application_id,)
+                    )
+                    conn.commit()
+                
                 cursor.close()
                 conn.close()
                 
@@ -110,7 +121,7 @@ class ApplicationService:
         """Update application fields"""
         try:
             # Build dynamic update query
-            allowed_fields = ['company_name', 'job_title', 'job_url', 'location', 
+            allowed_fields = ['company', 'company_name', 'job_title', 'position', 'job_url', 'location', 
                             'status', 'notes', 'applied_date', 'interview_date', 
                             'follow_up_date', 'salary_offered']
             
@@ -121,6 +132,16 @@ class ApplicationService:
                 if field in allowed_fields:
                     updates.append(f"{field} = %s")
                     values.append(value)
+            
+            # If company_name is updated, also update company (they should match)
+            if 'company_name' in kwargs and 'company' not in kwargs:
+                updates.append("company = %s")
+                values.append(kwargs['company_name'])
+            
+            # If job_title is updated, also update position (they should match)
+            if 'job_title' in kwargs and 'position' not in kwargs:
+                updates.append("position = %s")
+                values.append(kwargs['job_title'])
             
             if not updates:
                 return False

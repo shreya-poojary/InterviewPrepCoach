@@ -123,19 +123,27 @@ class QuestionService:
             if not set_name:
                 set_name = f"{question_type.title()} Questions - {jd.get('job_title', 'Unknown')}"
             
+            # Both 'name' and 'set_name' are required in the schema
             set_query = """
-                INSERT INTO question_sets (user_id, set_name, jd_id, resume_id, question_count)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO question_sets (user_id, name, set_name, jd_id, resume_id, question_count)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """
             set_id = execute_query(
                 set_query, 
-                (user_id, set_name, jd_id, resume_id, len(questions_data)),
+                (user_id, set_name, set_name, jd_id, resume_id, len(questions_data)),
                 commit=True
             )
             
             if not set_id:
                 print("[ERROR] Failed to create question set")
                 return None
+            
+            # Sync set_id column with id for code compatibility
+            execute_query(
+                "UPDATE question_sets SET set_id = id WHERE id = %s",
+                (set_id,),
+                commit=True
+            )
             
             print(f"[INFO] Created question set with ID: {set_id}")
             
@@ -147,22 +155,29 @@ class QuestionService:
                 if not question_text:
                     continue
                 
+                question_type = q_data.get('type', 'behavioral') if isinstance(q_data, dict) else 'behavioral'
+                difficulty = q_data.get('difficulty', 'medium') if isinstance(q_data, dict) else 'medium'
+                ideal_answer_points = json.dumps(q_data.get('ideal_answer_points', [])) if isinstance(q_data, dict) else '[]'
+                
                 question_query = """
                     INSERT INTO questions 
-                    (set_id, question_text, question_type, difficulty, category, ideal_answer_points)
+                    (question_set_id, set_id, question_text, question_type, difficulty, ideal_answer_points)
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """
                 
                 question_id = execute_query(
                     question_query,
-                    (set_id, 
-                     question_text,
-                     question_type, 
-                     q_data.get('difficulty', 'medium') if isinstance(q_data, dict) else 'medium',
-                     q_data.get('category', '') if isinstance(q_data, dict) else '',
-                     json.dumps(q_data.get('ideal_answer_points', [])) if isinstance(q_data, dict) else '[]'),
+                    (set_id, set_id, question_text, question_type, difficulty, ideal_answer_points),
                     commit=True
                 )
+                
+                # Sync question_id column with id for code compatibility
+                if question_id:
+                    execute_query(
+                        "UPDATE questions SET question_id = id WHERE id = %s",
+                        (question_id,),
+                        commit=True
+                    )
                 
                 if question_id:
                     saved_questions.append({

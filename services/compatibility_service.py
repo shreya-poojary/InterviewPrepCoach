@@ -35,9 +35,9 @@ class CompatibilityService:
                 if not resume_result:
                     return {"error": "Resume not found"}
                 
-                # Get JD
+                # Get JD (need both id and jd_id for the INSERT)
                 cursor.execute("""
-                    SELECT jd_text FROM job_descriptions
+                    SELECT id, jd_id, jd_text FROM job_descriptions
                     WHERE jd_id = %s
                 """, (jd_id,))
                 jd_result = cursor.fetchone()
@@ -47,6 +47,7 @@ class CompatibilityService:
             
             resume_text = resume_result['resume_text']
             jd_text = jd_result['jd_text']
+            job_description_id = jd_result['id']  # Get the actual id for job_description_id column
             
             print(f"[INFO] Resume text length: {len(resume_text)}, JD text length: {len(jd_text)}")
             
@@ -89,17 +90,25 @@ class CompatibilityService:
             with DatabaseManager.get_cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO compatibility_analyses
-                    (user_id, resume_id, jd_id, compatibility_score, matched_skills,
+                    (user_id, resume_id, job_description_id, jd_id, compatibility_score, matched_skills,
                      missing_skills, missing_qualifications, improvement_suggestions)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (user_id, resume_id, jd_id,
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (user_id, resume_id, job_description_id, jd_id,
                       analysis.get('compatibility_score'),
                       json.dumps(analysis.get('matched_skills', [])),
                       json.dumps(analysis.get('missing_skills', [])),
                       json.dumps(analysis.get('missing_qualifications', [])),
                       json.dumps(suggestions)))
                 
-                analysis['analysis_id'] = cursor.lastrowid
+                analysis_id = cursor.lastrowid
+                # Sync analysis_id column with id for code compatibility
+                if analysis_id:
+                    cursor.execute(
+                        "UPDATE compatibility_analyses SET analysis_id = id WHERE id = %s",
+                        (analysis_id,)
+                    )
+                
+                analysis['analysis_id'] = analysis_id
             
             # Ensure 'suggestions' key exists in returned analysis
             if 'suggestions' not in analysis and suggestions:

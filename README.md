@@ -1,6 +1,8 @@
 # Interview Prep AI 🎯
 
-An AI-powered desktop/web application for comprehensive interview preparation, built with **Flet** UI framework and **MySQL** database. Features include resume analysis, AI career coaching, interview question generation, document writing, and job search integration. Features include resume analysis, AI career coaching, interview question generation, document writing, and job search integration.
+An AI-powered desktop/web application for comprehensive interview preparation, built with **Flet** UI framework and **MySQL** database. Features include resume analysis, AI career coaching, interview question generation, mock interview practice, document writing, and job search integration.
+
+> 📦 **New to the project?** Start with the [Installation Guide](INSTALLATION.md) for step-by-step setup instructions.
 
 ## ✨ Features
 
@@ -14,12 +16,72 @@ An AI-powered desktop/web application for comprehensive interview preparation, b
 - Resume naming and job description metadata (company, job title)
 - Compact two-column layout with persistent results
 
+### 🎯 Mock Interview Hub (NEW!)
+- **Comprehensive Practice Hub** - Full interview simulation experience
+- **Multiple Interview Formats:**
+  - Traditional Interview
+  - Technical Interview
+  - Behavioral Interview (STAR method)
+  - Case Study Interview
+- **Session Setup Wizard:**
+  - Choose interview format
+  - Select question source (auto-generate, question set, or custom)
+  - Configure number of questions, difficulty, timing
+  - Set feedback mode (real-time, per-question, or post-session)
+- **Live Interview Flow:**
+  - One question at a time with progress tracking
+  - Notes area for keywords and preparation
+  - Flag questions for review
+  - Skip option (with limits)
+  - Pause/resume functionality
+- **Response Modes:**
+  - Written responses (text input)
+  - Audio recording (with transcription)
+  - Video recording (with analysis)
+- **AI-Powered Evaluation:**
+  - Content scoring (relevance, depth, specificity)
+  - STAR method analysis for behavioral questions
+  - Delivery metrics (pace, tone, clarity)
+  - Strengths and weaknesses identification
+  - Actionable improvement suggestions
+- **Practice Library:**
+  - Searchable session history
+  - View transcripts, audio, and video recordings
+  - Track progress over time
+  - Export session reports
+
+### 🎤 Practice Sessions
+- **Three Response Modes:**
+  - 📝 **Written** - Type your answers
+  - 🎤 **Audio** - Record and transcribe responses
+  - 🎥 **Video** - Record video with analysis
+- **Question Set Selection** - Choose from generated question sets
+- **AI Evaluation:**
+  - Score (0-100) with color-coded feedback
+  - STAR method breakdown
+  - Strengths and areas for improvement
+  - Specific suggestions for enhancement
+- **Session History** - View and review past practice sessions
+- **Timer Tracking** - Monitor response time
+
+### ❓ Questions Generator
+- Generate personalized interview questions based on:
+  - Your resume
+  - Selected job description
+  - Question types (technical, behavioral, situational, company-specific)
+- Customizable question count (3-15 questions)
+- Save question sets for practice
+- View previous question sets
+- Export questions for offline review
+
 ### 💼 Job Opportunities (JSearch Integration)
 - Real-time job search from multiple sources
 - Automatic compatibility ranking with your resume
 - Remote job filtering
 - Save jobs for later
 - View detailed job descriptions
+- Add saved jobs to application planner
+- Search history tracking
 
 ### 🧠 AI Career Coach
 - **Chat Interface** - Conversational AI coach with full message history
@@ -36,14 +98,6 @@ An AI-powered desktop/web application for comprehensive interview preparation, b
 - **Markdown Support** - Rich text formatting (bold, lists) in responses
 - **Persistent State** - Chat history persists across tab switches
 
-### ❓ Questions Generator
-- Generate personalized interview questions based on:
-  - Your resume
-  - Selected job description
-  - Question types (technical, behavioral, situational)
-- Save question sets for practice
-- Export questions for offline review
-
 ### ✍️ Document Writer
 - **Resume Generator** - AI-powered resume creation and enhancement
 - **Cover Letter Generator** - Personalized cover letters based on:
@@ -53,6 +107,15 @@ An AI-powered desktop/web application for comprehensive interview preparation, b
 - Resume selection/upload for context-aware generation
 - Export to TXT and DOCX formats
 
+### 📅 Application Planner
+- Track job applications with status pipeline
+- Add applications manually or from job search
+- Status tracking: Saved, Applied, Screening, Interview, Offer, Rejected
+- Date tracking (applied date, interview date)
+- Salary expectations and notes
+- Statistics dashboard
+- Filter by status
+
 ### 🎯 Settings & LLM Configuration
 - Support for multiple LLM providers:
   - **OpenAI** (GPT-4, GPT-3.5)
@@ -61,93 +124,39 @@ An AI-powered desktop/web application for comprehensive interview preparation, b
   - **Ollama** (Local LLMs: Llama 3.2, Mistral, Phi-3)
 - Configurable temperature and max tokens
 - API key encryption for security
-- Test connection functionality
+- Test connection functionality with detailed feedback
 - Settings persistence with confirmation feedback
+- Model selection per provider
 
-### 🚧 Coming Soon
-- Practice Sessions (Written/Audio/Video)
-- Application Planner & Tracker
+## 🚀 Quick Start
 
-## 🚀 Installation
+For detailed installation instructions, see **[INSTALLATION.md](INSTALLATION.md)**.
 
-### Prerequisites
-- **Python 3.9+**
-- **MySQL 8.0+** (running locally or remotely)
-- API keys for your chosen LLM provider (optional for Ollama)
-
-### Step 1: Clone and Setup
+### Quick Installation (5 minutes)
 
 ```bash
-# Navigate to project directory
+# 1. Clone/download the project
 cd interview_prep_ai
 
-# Create virtual environment
+# 2. Create virtual environment
 python -m venv venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # macOS/Linux
 
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
+# 3. Install dependencies
 pip install -r requirements.txt
-```
 
-### Step 2: Configure Environment
+# 4. Create .env file (see INSTALLATION.md for template)
+# Configure database and API keys
 
-Create a `.env` file in the project root (copy from `.env.example`):
-
-```env
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=interview_prep_ai
-DB_USER=your_mysql_username
-DB_PASSWORD=your_mysql_password
-
-# API Keys (at least one required)
-JSEARCH_API_KEY=your_jsearch_rapidapi_key  # For job search
-OPENAI_API_KEY=your_openai_api_key         # For OpenAI
-ANTHROPIC_API_KEY=your_anthropic_api_key   # For Claude
-AWS_ACCESS_KEY_ID=your_aws_key             # For Bedrock
-AWS_SECRET_ACCESS_KEY=your_aws_secret
-AWS_REGION=us-east-1
-
-# Ollama (if using local LLMs)
-OLLAMA_BASE_URL=http://localhost:11434
-
-# App Configuration
-APP_SECRET_KEY=your_random_secret_key_here
-DEBUG_MODE=True
-DEFAULT_USER_ID=1
-```
-
-### Step 3: Initialize Database
-
-```bash
-# Create database and tables automatically
+# 5. Setup database
 python database/create_db.py
-```
 
-You should see output like:
-```
-🚀 Starting database setup...
-✓ Database 'interview_prep_ai' created/verified
-✓ All tables created successfully
-✓ Indexes created successfully
-✓ Default user created
-✅ Database setup completed successfully!
-```
-
-### Step 4: Run the Application
-
-```bash
-# Start the Flet application
+# 6. Run application
 python main.py
 ```
 
-The application will open in a new window (desktop app mode) or your browser (web mode).
+**For complete step-by-step guide with troubleshooting, see [INSTALLATION.md](INSTALLATION.md)**
 
 ## 📁 Project Structure
 
@@ -165,23 +174,29 @@ interview_prep_ai/
 ├── database/
 │   ├── connection.py               # Database connection pool
 │   ├── create_db.py                # Auto database setup script
+│   ├── schema.py                   # Database schema definitions
 │   └── migrations/
-│       ├── 001_initial_schema.sql  # Database schema
-│       └── 002_add_indexes.sql     # Performance indexes
+│       ├── 001_initial_schema.sql  # Initial database schema
+│       ├── 002_add_indexes.sql     # Performance indexes
+│       ├── 003_add_jsearch_history.sql  # JSearch history table
+│       └── 004_add_mock_interview_tables.sql  # Mock interview tables
 │
 ├── core/
 │   ├── document_parser.py          # PDF/DOCX/TXT parsing
 │   ├── text_extractor.py           # Text extraction utilities
 │   ├── encryption.py               # API key encryption
 │   ├── auth.py                     # Authentication (simple)
-│   └── validators.py               # Input validation
+│   ├── validators.py               # Input validation
+│   └── recording_service.py        # Audio/video recording (NEW)
 │
 ├── ai/
+│   ├── agents/
+│   │   └── career_coach.py         # Career coach agent
 │   └── providers/
 │       ├── base_provider.py        # Abstract LLM provider
 │       ├── openai_provider.py      # OpenAI implementation
-│       ├── anthropic_provider.py   # Anthropic implementation
-│       ├── bedrock_provider.py     # AWS Bedrock implementation
+│       ├── anthropic_provider.py  # Anthropic implementation
+│       ├── bedrock_provider.py    # AWS Bedrock implementation
 │       └── ollama_provider.py      # Ollama implementation
 │
 ├── services/
@@ -191,9 +206,10 @@ interview_prep_ai/
 │   ├── compatibility_service.py    # Compatibility analysis
 │   ├── question_service.py         # Question generation
 │   ├── practice_service.py         # Practice sessions
+│   ├── mock_interview_service.py   # Mock interview sessions (NEW)
 │   ├── jsearch_service.py          # JSearch API integration
-│   ├── document_service.py         # Document generation (resume, cover letter, email)
-│   ├── coach_service.py           # AI Career Coach
+│   ├── document_service.py         # Document generation
+│   ├── coach_service.py            # AI Career Coach
 │   └── application_service.py      # Application tracking
 │
 ├── ui/
@@ -207,10 +223,12 @@ interview_prep_ai/
 │   │   ├── profile_analysis_view.py # Resume analysis
 │   │   ├── opportunities_view.py    # Job search
 │   │   ├── questions_view.py       # Questions generator
+│   │   ├── practice_view.py        # Practice sessions
+│   │   ├── mock_interview_view.py  # Mock interview hub (NEW)
 │   │   ├── writer_view.py          # Document writer
+│   │   ├── planner_view.py         # Application planner
 │   │   ├── coach_view.py           # AI Career Coach
-│   │   ├── settings_view.py        # Settings
-│   │   └── placeholder_view.py     # Coming soon views
+│   │   └── settings_view.py        # Settings
 │   └── styles/
 │       ├── theme.py                # Color schemes
 │       └── constants.py            # UI constants
@@ -220,6 +238,8 @@ interview_prep_ai/
     ├── job_descriptions/
     ├── documents/
     ├── recordings/
+    │   ├── audio/
+    │   └── video/
     └── logs/
 ```
 
@@ -244,9 +264,9 @@ interview_prep_ai/
 
 **Ollama (Local):**
 1. Install Ollama: https://ollama.ai/
-2. Pull a model: `ollama pull llama3`
+2. Pull a model: `ollama pull llama3.2`
 3. Start Ollama: `ollama serve`
-4. Configure in Settings UI
+4. Configure in Settings UI (endpoint: `http://localhost:11434`)
 
 ### JSearch API Setup
 
@@ -267,7 +287,36 @@ interview_prep_ai/
 6. View compatibility score, matched/missing skills, and suggestions
 7. Access **Previous Analyses** to view past results
 
-### 2. AI Career Coach
+### 2. Mock Interview Hub
+1. Go to **Practice** → Click **Mock Interview Hub** button (or navigate to `/mock-interview`)
+2. Click **➕ New Mock Interview**
+3. **Setup Wizard:**
+   - Select interview format (Traditional, Technical, Behavioral, Case)
+   - Choose question source (Auto-generate, Question Set, or Custom)
+   - Configure: number of questions, difficulty, timing, feedback mode
+   - Enter session name
+4. Click **🚀 Start Mock Interview**
+5. **Live Session:**
+   - Answer questions one at a time
+   - Use notes area for keywords
+   - Flag questions for review or skip if needed
+   - Submit responses
+6. **View Results:**
+   - See AI evaluation with scores
+   - Review strengths and weaknesses
+   - Access practice library for history
+
+### 3. Practice Sessions
+1. Go to **Practice**
+2. Select a question set from dropdown
+3. Choose a question
+4. Select response mode (Written, Audio, or Video)
+5. Click **▶ Start Practice**
+6. Record/type your response
+7. Click **✓ Submit Response** for AI evaluation
+8. View detailed feedback with scores and suggestions
+
+### 4. AI Career Coach
 1. Go to **Career Coach**
 2. Click **Start New Coaching Session** (or use existing)
 3. Use **Quick Advice** buttons for instant tips
@@ -276,15 +325,16 @@ interview_prep_ai/
 6. View **Previous Sessions** to reload past conversations
 7. Click **End Session** when done
 
-### 3. Questions Generator
+### 5. Questions Generator
 1. Go to **Questions**
 2. Select a resume from dropdown
 3. Select or upload a job description
-4. Click **Generate Questions**
-5. Review generated questions
-6. Save question sets for practice
+4. Choose question type and count
+5. Click **✨ Generate Questions**
+6. Review generated questions
+7. Save question sets for practice
 
-### 4. Document Writer
+### 6. Document Writer
 1. Go to **Writer**
 2. Select tab: Resume, Cover Letter, or Cold Email
 3. Select/upload a resume for context
@@ -293,23 +343,71 @@ interview_prep_ai/
 6. Review and edit generated document
 7. Click **Export** to save as TXT or DOCX
 
-### 5. Job Search
+### 7. Job Search
 1. Go to **Opportunities**
 2. Enter search keywords (e.g., "Python Developer")
 3. Optionally add location
 4. Check "Remote only" if desired
 5. Click **Search Jobs**
 6. View jobs ranked by compatibility
-7. Save interesting jobs or apply directly
+7. Save interesting jobs or add to planner
 
-### 6. LLM Configuration
+### 8. Application Planner
+1. Go to **Planner**
+2. Click **➕ New Application**
+3. Fill in company, position, dates, status
+4. Add notes and salary expectations
+5. Track status through pipeline
+6. View statistics dashboard
+
+### 9. LLM Configuration
 1. Go to **Settings**
 2. Select LLM Provider
 3. Choose model
 4. Enter API key (if required)
 5. Adjust temperature and max tokens
-6. Click **Test Connection**
+6. Click **Test Connection** (with feedback)
 7. Click **Save Settings** (confirmation will appear)
+
+## 📊 Database Schema
+
+The application uses MySQL with the following main tables:
+
+**Core Tables:**
+- `users` & `user_profiles` - User information
+- `resumes` - Uploaded resumes with parsed data
+- `job_descriptions` - Job descriptions with metadata
+- `compatibility_analyses` - Analysis results and history
+
+**Interview Preparation:**
+- `question_sets` & `questions` - Interview questions
+- `practice_sessions` - Practice history (written/audio/video)
+- `mock_interview_sessions` - Mock interview sessions (NEW)
+- `mock_interview_responses` - Per-question responses (NEW)
+- `mock_interview_feedback` - AI evaluations (NEW)
+- `mock_interview_analytics` - Session analytics (NEW)
+
+**Job Search:**
+- `applications` & `application_reminders` - Application tracking
+- `jsearch_jobs` - Cached job listings
+- `jsearch_history` - Search history
+
+**AI & Coaching:**
+- `llm_settings` - User LLM configuration
+- `coach_conversations` & `coach_messages` - Career coach chat sessions
+- `generated_documents` - Generated resumes, cover letters, emails
+
+## ⚠️ Troubleshooting
+
+For detailed troubleshooting, see **[INSTALLATION.md](INSTALLATION.md#-troubleshooting)**.
+
+**Common Issues:**
+
+- **Database connection failed:** See [INSTALLATION.md - Database Connection](INSTALLATION.md#database-connection-failed)
+- **LLM connection failed:** See [INSTALLATION.md - LLM Connection](INSTALLATION.md#llm-connection-failed)
+- **File upload not working:** See [INSTALLATION.md - File Upload](INSTALLATION.md#file-upload-not-working)
+- **Audio/Video recording not working:** See [INSTALLATION.md - Audio/Video](INSTALLATION.md#audiovideo-recording-not-working)
+- **Mock interview tables missing:** See [INSTALLATION.md - Migrations](INSTALLATION.md#mock-interview-tables-missing)
 
 ## 🛠️ Development
 
@@ -317,8 +415,14 @@ interview_prep_ai/
 
 **Reset database:**
 ```bash
-# Drop and recreate
+# Drop and recreate (WARNING: Deletes all data)
 python database/create_db.py
+```
+
+**Apply migrations:**
+```bash
+# Apply specific migration
+python -c "import mysql.connector, os; from dotenv import load_dotenv; load_dotenv(); conn=mysql.connector.connect(host=os.getenv('DB_HOST','localhost'), port=int(os.getenv('DB_PORT',3306)), user=os.getenv('DB_USER','root'), password=os.getenv('DB_PASSWORD',''), database=os.getenv('DB_NAME','interview_prep_ai')); cursor=conn.cursor(); sql=open('database/migrations/004_add_mock_interview_tables.sql','r',encoding='utf-8').read(); statements=[s.strip() for s in sql.split(';') if s.strip() and not s.strip().startswith('--')]; [cursor.execute(stmt) for stmt in statements]; conn.commit(); cursor.close(); conn.close(); print('Migration applied')"
 ```
 
 **Verify database:**
@@ -332,53 +436,8 @@ DatabaseManager.test_connection()
 1. Create service in `services/`
 2. Create UI view in `ui/views/`
 3. Add route in `main.py`
-4. Add navigation item in `ui/components/navigation.py`
-
-## 📊 Database Schema
-
-The application uses MySQL with the following main tables:
-- `users` & `user_profiles` - User information
-- `resumes` - Uploaded resumes with parsed data
-- `job_descriptions` - Job descriptions with metadata
-- `compatibility_analyses` - Analysis results and history
-- `question_sets` & `questions` - Interview questions
-- `practice_sessions` - Practice history
-- `applications` & `reminders` - Application tracking
-- `jsearch_jobs` - Cached job listings
-- `llm_settings` - User LLM configuration
-- `coach_conversations` - Career coach chat sessions
-- `coach_messages` - Chat message history
-
-## ⚠️ Troubleshooting
-
-**Database connection failed:**
-- Verify MySQL is running
-- Check credentials in `.env`
-- Run `python database/create_db.py`
-
-**LLM connection failed:**
-- Verify API key is correct
-- Check network connection
-- For Ollama: ensure `ollama serve` is running
-
-**File upload not working:**
-- Check file permissions on `data/` directory
-- Verify file size is reasonable (<10MB)
-- For desktop mode: Ensure file picker has proper permissions
-
-**Quick advice not showing:**
-- Ensure a coaching session is active (will auto-start)
-- Check LLM provider is configured correctly
-- Verify Ollama is running if using local LLM (`ollama serve`)
-
-**View state not persisting:**
-- Views are cached automatically - state should persist across tabs
-- If issues occur, restart the application
-
-**JSearch API errors:**
-- Verify API key is valid
-- Check RapidAPI subscription status
-- Review rate limits
+4. Add navigation item in `ui/components/navigation.py` (if needed)
+5. Create database migration if new tables needed
 
 ## 📝 License
 
@@ -396,3 +455,5 @@ For issues or questions, please check the troubleshooting section above or revie
 
 **Built with ❤️ using Flet, MySQL, and AI**
 
+**Version:** 1.0.0  
+**Last Updated:** 2024

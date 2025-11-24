@@ -40,6 +40,11 @@ class NavigationRailComponent:
                     label="Practice"
                 ),
                 ft.NavigationRailDestination(
+                    icon=ft.Icons.RECORD_VOICE_OVER_OUTLINED,
+                    selected_icon=ft.Icons.RECORD_VOICE_OVER,
+                    label="Mock Interview"
+                ),
+                ft.NavigationRailDestination(
                     icon=ft.Icons.WORK_OUTLINED,
                     selected_icon=ft.Icons.WORK,
                     label="Opportunities"

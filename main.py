@@ -74,6 +74,9 @@ def main(page: ft.Page):
                 if route not in view_cache:
                     view_cache[route] = QuestionsView(page)
                 view = view_cache[route]
+                # Refresh JD dropdown when accessing view
+                if hasattr(view, '_refresh_jd_dropdown'):
+                    view._refresh_jd_dropdown()
                 nav_index = 2
             elif route == "/practice":
                 if route not in view_cache:
@@ -86,33 +89,41 @@ def main(page: ft.Page):
                     from ui.views.mock_interview_view import MockInterviewView
                     view_cache[route] = MockInterviewView(page)
                 view = view_cache[route]
-                nav_index = 3  # Share same nav index or create new
+                nav_index = 4
             elif route == "/opportunities":
                 if route not in view_cache:
                     view_cache[route] = OpportunitiesView(page)
                 view = view_cache[route]
-                nav_index = 4
+                nav_index = 5
             elif route == "/writer":
                 if route not in view_cache:
                     view_cache[route] = WriterView(page)
                 view = view_cache[route]
-                nav_index = 5
+                # Refresh JD dropdowns when accessing view
+                if hasattr(view, '_refresh_jd_dropdowns'):
+                    view._refresh_jd_dropdowns()
+                nav_index = 6
             elif route == "/planner":
                 if route not in view_cache:
                     view_cache[route] = PlannerView(page)
                 view = view_cache[route]
-                # Applications will be loaded in build() method
-                nav_index = 6
+                # Reload applications when navigating to planner
+                if hasattr(view, 'load_applications'):
+                    try:
+                        view.load_applications(view.selected_status_filter)
+                    except Exception as e:
+                        print(f"[ERROR] Error reloading applications: {e}")
+                nav_index = 7
             elif route == "/coach":
                 if route not in view_cache:
                     view_cache[route] = CoachView(page)
                 view = view_cache[route]
-                nav_index = 7
+                nav_index = 8
             elif route == "/settings":
                 if route not in view_cache:
                     view_cache[route] = SettingsView(page)
                 view = view_cache[route]
-                nav_index = 8
+                nav_index = 9
             else:
                 if "/" not in view_cache:
                     view_cache["/"] = HomeView(page)
@@ -157,16 +168,16 @@ def main(page: ft.Page):
     def on_navigation_change(e):
         """Handle navigation rail selection"""
         routes = [
-            "/",
-            "/profile_analysis",
-            "/questions",
-            "/practice",
-            "/mock-interview",
-            "/opportunities",
-            "/writer",
-            "/planner",
-            "/coach",
-            "/settings"
+            "/",                    # 0 - Home
+            "/profile_analysis",     # 1 - Profile Analysis
+            "/questions",            # 2 - Questions
+            "/practice",            # 3 - Practice
+            "/mock-interview",       # 4 - Mock Interview
+            "/opportunities",       # 5 - Opportunities
+            "/writer",              # 6 - Writer
+            "/planner",             # 7 - Planner
+            "/coach",               # 8 - Career Coach
+            "/settings"             # 9 - Settings
         ]
         
         if e.control.selected_index < len(routes):
