@@ -26,47 +26,47 @@ def create_database():
         
         cursor = connection.cursor()
         
-        print(\"Creating database...\")
+        print("Creating database...")
         cursor.execute(CREATE_DATABASE)
-        print(\"âœ“ Database created\")
+        print("[OK] Database created")
         
         # Select the database
         database_name = os.getenv('DB_NAME', 'interview_prep_ai')
-        cursor.execute(f\"USE {database_name}\")
+        cursor.execute(f"USE {database_name}")
         
-        print(\"\\nCreating tables...\")
+        print("\nCreating tables...")
         for i, table_sql in enumerate(CREATE_TABLES, 1):
             cursor.execute(table_sql)
-            print(f\"âœ“ Created table {i}/{len(CREATE_TABLES)}\")
+            print(f"[OK] Created table {i}/{len(CREATE_TABLES)}")
         
-        print(\"\\nInserting default user...\")
+        print("\nInserting default user...")
         cursor.execute(INSERT_DEFAULT_USER)
         connection.commit()
-        print(\"âœ“ Default user created\")
+        print("[OK] Default user created")
         
         cursor.close()
         connection.close()
         
-        print(\"\\nâœ“ Database setup completed successfully!\")
+        print("\n[OK] Database setup completed successfully!")
         return True
         
     except mysql.connector.Error as err:
-        print(f\"\\nâœ— Error: {err}\")
+        print(f"\n[ERROR] {err}")
         return False
     except Exception as e:
-        print(f\"\\nâœ— Unexpected error: {e}\")
+        print(f"\n[ERROR] Unexpected error: {e}")
         return False
 
-if __name__ == \"__main__\":
-    print(\"=\"*50)
-    print(\"Interview Prep AI - Database Setup\")
-    print(\"=\"*50)
+if __name__ == "__main__":
+    print("="*50)
+    print("Interview Prep AI - Database Setup")
+    print("="*50)
     print()
     
     success = create_database()
     
     if success:
-        print(\"\\nYou can now run the application with: python main.py\")
+        print("\nYou can now run the application with: python main.py")
     else:
-        print(\"\\nPlease check your database configuration in .env file\")
+        print("\nPlease check your database configuration in .env file")
         sys.exit(1)
