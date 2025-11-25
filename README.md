@@ -10,11 +10,13 @@ An AI-powered desktop/web application for comprehensive interview preparation, b
 - Upload resume (PDF, DOCX, TXT) with automatic parsing
 - Paste or upload job descriptions
 - AI-powered compatibility analysis (0-100% score)
+- **Robust LLM Response Normalization** - Works consistently across all LLM providers (OpenAI, Anthropic, Bedrock, Ollama)
 - Matched and missing skills identification (color-coded chips)
-- Improvement suggestions
+- Strengths and improvement suggestions
 - **Previous Analyses** - View and reload past compatibility analyses
 - Resume naming and job description metadata (company, job title)
 - Compact two-column layout with persistent results
+- Intelligent text truncation for long resumes/JDs while preserving analysis quality
 
 ### 🎯 Mock Interview Hub (NEW!)
 - **Comprehensive Practice Hub** - Full interview simulation experience
@@ -115,16 +117,25 @@ An AI-powered desktop/web application for comprehensive interview preparation, b
 - Salary expectations and notes
 - Statistics dashboard
 - Filter by status
+- Convert saved jobs from job search to tracked applications
+- Edit, update status, and delete applications
+- View job URLs and application details
 
 ### 🎯 Settings & LLM Configuration
 - Support for multiple LLM providers:
   - **OpenAI** (GPT-4, GPT-3.5)
   - **Anthropic** (Claude 3 Opus, Sonnet, Haiku)
   - **AWS Bedrock** (Claude, Titan, etc.)
-  - **Ollama** (Local LLMs: Llama 3.2, Mistral, Phi-3)
+  - **Ollama** (Local LLMs: Llama 3.2, Mistral, Phi-3, TinyLlama)
+- **Advanced LLM Integration:**
+  - System/user prompt separation for better instruction adherence
+  - Intelligent prompt truncation (preserves format instructions)
+  - Robust JSON parsing and repair (handles malformed LLM responses)
+  - Response normalizer for consistent output across providers
+  - Memory-aware error handling for Ollama (suggests smaller models)
 - Configurable temperature and max tokens
 - API key encryption for security
-- Test connection functionality with detailed feedback
+- Test connection functionality with detailed feedback (modal dialogs)
 - Settings persistence with confirmation feedback
 - Model selection per provider
 
@@ -187,7 +198,8 @@ interview_prep_ai/
 │   ├── encryption.py               # API key encryption
 │   ├── auth.py                     # Authentication (simple)
 │   ├── validators.py               # Input validation
-│   └── recording_service.py        # Audio/video recording (NEW)
+│   ├── recording_service.py        # Audio/video recording
+│   └── response_normalizer.py     # LLM response normalization (NEW)
 │
 ├── ai/
 │   ├── agents/
@@ -203,10 +215,10 @@ interview_prep_ai/
 │   ├── llm_service.py              # LLM provider management
 │   ├── resume_service.py           # Resume operations
 │   ├── jd_service.py               # Job description operations
-│   ├── compatibility_service.py    # Compatibility analysis
+│   ├── compatibility_service.py    # Compatibility analysis with normalizer
 │   ├── question_service.py         # Question generation
 │   ├── practice_service.py         # Practice sessions
-│   ├── mock_interview_service.py   # Mock interview sessions (NEW)
+│   ├── mock_interview_service.py   # Mock interview sessions
 │   ├── jsearch_service.py          # JSearch API integration
 │   ├── document_service.py         # Document generation
 │   ├── coach_service.py            # AI Career Coach
@@ -354,11 +366,13 @@ interview_prep_ai/
 
 ### 8. Application Planner
 1. Go to **Planner**
-2. Click **➕ New Application**
+2. Click **➕ New Application** (dialog will open)
 3. Fill in company, position, dates, status
 4. Add notes and salary expectations
-5. Track status through pipeline
-6. View statistics dashboard
+5. Click **Add Application** to save
+6. Track status through pipeline using **Update Status** button
+7. Edit applications or convert saved jobs from job search
+8. View statistics dashboard and filter by status
 
 ### 9. LLM Configuration
 1. Go to **Settings**
@@ -405,9 +419,21 @@ For detailed troubleshooting, see **[INSTALLATION.md](INSTALLATION.md#-troublesh
 
 - **Database connection failed:** See [INSTALLATION.md - Database Connection](INSTALLATION.md#database-connection-failed)
 - **LLM connection failed:** See [INSTALLATION.md - LLM Connection](INSTALLATION.md#llm-connection-failed)
+- **Ollama 500 errors / Memory issues:** 
+  - Try a smaller model: `ollama pull tinyllama`
+  - Use CPU-only mode: `OLLAMA_NUM_GPU=0 ollama serve`
+  - The app will suggest smaller models automatically
+- **Compatibility analysis showing 0% or missing skills:**
+  - The response normalizer handles various LLM output formats
+  - If issues persist, try a different LLM provider
+  - Check that resume and JD text are not empty
 - **File upload not working:** See [INSTALLATION.md - File Upload](INSTALLATION.md#file-upload-not-working)
 - **Audio/Video recording not working:** See [INSTALLATION.md - Audio/Video](INSTALLATION.md#audiovideo-recording-not-working)
 - **Mock interview tables missing:** See [INSTALLATION.md - Migrations](INSTALLATION.md#mock-interview-tables-missing)
+- **Dialogs not appearing:** Ensure you're using the latest version. Dialogs use `page.overlay` for proper rendering.
+- **Planner not loading:** Check database connection and ensure `applications` table exists.
+- **Dropdown errors:** Fixed in latest version - dropdowns refresh after views are built.
+- **Document generation errors:** Ensure `generated_documents` table has correct schema (uses `job_description_id`, not `jd_id`).
 
 ## 🛠️ Development
 
@@ -455,5 +481,15 @@ For issues or questions, please check the troubleshooting section above or revie
 
 **Built with ❤️ using Flet, MySQL, and AI**
 
-**Version:** 1.0.0  
-**Last Updated:** 2024
+## 🔄 Recent Updates
+
+**Latest Improvements (v1.1.0):**
+- ✅ **LLM Response Consistency** - Moved format instructions to system prompt, added intelligent text truncation
+- ✅ **Response Normalizer** - Handles inconsistent JSON outputs from different LLM providers
+- ✅ **Enhanced Error Handling** - Better Ollama memory error messages, JSON repair for malformed responses
+- ✅ **UI Fixes** - Fixed dropdown refresh errors in Questions and Writer views
+- ✅ **Schema Alignment** - Fixed DocumentService to use correct database columns
+- ✅ **Improved Prompt Engineering** - System/user prompt separation for better LLM adherence
+
+**Version:** 1.1.0  
+**Last Updated:** November 2024
