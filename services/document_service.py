@@ -74,12 +74,13 @@ Skills: {json.dumps(resume.get('parsed_data', {}).get('skills', [])) if isinstan
             # Save to database
             query = """
                 INSERT INTO generated_documents
-                (user_id, document_type, jd_id, content, tone, version)
-                VALUES (%s, 'resume', %s, %s, %s, 1)
+                (user_id, document_type, job_description_id, title, content, template_used)
+                VALUES (%s, 'resume', %s, %s, %s, %s)
             """
+            title = f"Resume - {template.title()}"
             document_id = execute_query(
                 query,
-                (user_id, jd_id, resume_content, template),
+                (user_id, jd_id, title, resume_content, template),
                 commit=True
             )
             
@@ -186,12 +187,13 @@ Skills: {json.dumps(resume.get('parsed_data', {}).get('skills', [])) if isinstan
             # Save to database
             query = """
                 INSERT INTO generated_documents
-                (user_id, document_type, jd_id, content, tone, version)
-                VALUES (%s, 'cover_letter', %s, %s, %s, 1)
+                (user_id, document_type, job_description_id, title, content, template_used)
+                VALUES (%s, 'cover_letter', %s, %s, %s, %s)
             """
+            title = f"Cover Letter - {length.title()}"
             document_id = execute_query(
                 query,
-                (user_id, jd_id, cover_letter_content, length),
+                (user_id, jd_id, title, cover_letter_content, length),
                 commit=True
             )
             
@@ -306,12 +308,13 @@ Skills: {json.dumps(resume.get('parsed_data', {}).get('skills', [])) if isinstan
             # Save to database
             query = """
                 INSERT INTO generated_documents
-                (user_id, document_type, jd_id, content, tone, version)
-                VALUES (%s, 'cold_email', %s, %s, %s, 1)
+                (user_id, document_type, job_description_id, title, content, template_used)
+                VALUES (%s, 'cold_email', %s, %s, %s, %s)
             """
+            title = f"Cold Email - {purpose.title()}"
             document_id = execute_query(
                 query,
-                (user_id, jd_id, email_content, recipient_type),
+                (user_id, jd_id, title, email_content, recipient_type),
                 commit=True
             )
             

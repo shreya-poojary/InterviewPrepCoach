@@ -96,9 +96,7 @@ def main(page: ft.Page):
                 if route not in view_cache:
                     view_cache[route] = WriterView(page)
                 view = view_cache[route]
-                # Refresh JD dropdowns when accessing view
-                if hasattr(view, '_refresh_jd_dropdowns'):
-                    view._refresh_jd_dropdowns()
+                # Refresh JD dropdowns after view is built (handled in build section)
                 nav_index = 6
             elif route == "/planner":
                 if route not in view_cache:
@@ -137,12 +135,17 @@ def main(page: ft.Page):
                     raise ValueError("View.build() returned None")
                 current_view.content = view_content
                 
-                # Refresh JD dropdown after view is built and added to page (for questions view)
+                # Refresh JD dropdown after view is built and added to page (for questions and writer views)
                 if route == "/questions" and hasattr(view, '_refresh_jd_dropdown'):
                     try:
                         view._refresh_jd_dropdown()
                     except Exception as e:
                         print(f"[DEBUG] Could not refresh JD dropdown (view not fully initialized): {e}")
+                elif route == "/writer" and hasattr(view, '_refresh_jd_dropdowns'):
+                    try:
+                        view._refresh_jd_dropdowns()
+                    except Exception as e:
+                        print(f"[DEBUG] Could not refresh JD dropdowns (view not fully initialized): {e}")
                 
             except Exception as build_error:
                 print(f"[ERROR] Error building view content: {build_error}")

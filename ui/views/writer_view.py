@@ -38,19 +38,34 @@ class WriterView:
             self.resume_jd_dropdown.options = jd_options.copy()
             self.resume_jd_dropdown.disabled = len(jds) == 0
             self.resume_jd_dropdown.hint_text = "Choose a JD" if jds else "Add a job description first"
-            self.resume_jd_dropdown.update()
+            # Only update if the control is already added to the page
+            try:
+                if hasattr(self.resume_jd_dropdown, '_Control__page') and self.resume_jd_dropdown._Control__page:
+                    self.resume_jd_dropdown.update()
+            except (AttributeError, AssertionError):
+                pass
             
         if self.cover_letter_jd_dropdown:
             self.cover_letter_jd_dropdown.options = jd_options.copy()
             self.cover_letter_jd_dropdown.disabled = len(jds) == 0
             self.cover_letter_jd_dropdown.hint_text = "Choose a JD" if jds else "Add a job description first"
-            self.cover_letter_jd_dropdown.update()
+            # Only update if the control is already added to the page
+            try:
+                if hasattr(self.cover_letter_jd_dropdown, '_Control__page') and self.cover_letter_jd_dropdown._Control__page:
+                    self.cover_letter_jd_dropdown.update()
+            except (AttributeError, AssertionError):
+                pass
             
         if self.cold_email_jd_dropdown:
             self.cold_email_jd_dropdown.options = (
                 [ft.dropdown.Option("", "None")] + jd_options.copy()
             )
-            self.cold_email_jd_dropdown.update()
+            # Only update if the control is already added to the page
+            try:
+                if hasattr(self.cold_email_jd_dropdown, '_Control__page') and self.cold_email_jd_dropdown._Control__page:
+                    self.cold_email_jd_dropdown.update()
+            except (AttributeError, AssertionError):
+                pass
         
     def build(self) -> ft.Container:
         """Build writer view"""
