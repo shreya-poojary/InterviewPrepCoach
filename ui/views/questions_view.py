@@ -26,7 +26,13 @@ class QuestionsView:
             ]
             self.jd_dropdown.disabled = len(jds) == 0
             self.jd_dropdown.hint_text = "Choose a job description" if jds else "Add a job description first"
-            self.jd_dropdown.update()
+            # Only update if the control is already added to the page
+            try:
+                if hasattr(self.jd_dropdown, '_Control__page') and self.jd_dropdown._Control__page:
+                    self.jd_dropdown.update()
+            except (AttributeError, AssertionError):
+                # Control not yet added to page, skip update - it will be refreshed when view is built
+                pass
         
     def build(self) -> ft.Container:
         """Build the questions view"""

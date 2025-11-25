@@ -74,9 +74,6 @@ def main(page: ft.Page):
                 if route not in view_cache:
                     view_cache[route] = QuestionsView(page)
                 view = view_cache[route]
-                # Refresh JD dropdown when accessing view
-                if hasattr(view, '_refresh_jd_dropdown'):
-                    view._refresh_jd_dropdown()
                 nav_index = 2
             elif route == "/practice":
                 if route not in view_cache:
@@ -139,6 +136,14 @@ def main(page: ft.Page):
                 if view_content is None:
                     raise ValueError("View.build() returned None")
                 current_view.content = view_content
+                
+                # Refresh JD dropdown after view is built and added to page (for questions view)
+                if route == "/questions" and hasattr(view, '_refresh_jd_dropdown'):
+                    try:
+                        view._refresh_jd_dropdown()
+                    except Exception as e:
+                        print(f"[DEBUG] Could not refresh JD dropdown (view not fully initialized): {e}")
+                
             except Exception as build_error:
                 print(f"[ERROR] Error building view content: {build_error}")
                 current_view.content = ft.Container(
